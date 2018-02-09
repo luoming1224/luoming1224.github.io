@@ -79,13 +79,21 @@
 
 
 
-<meta property="og:type" content="website">
+<meta name="description" content="概述ConcurrentHashMap是HashMap的线程安全版本，可以用来替代HashTable，HashTable的线程安全是通过用synchronized关键词来修饰每个方法来实现，，即Hashtable是针对整个table的锁定，同一时刻只能有一个方法被一个线程执行，这样就导致HashTable容器在竞争激烈的并发环境下表现出效率低下。而在java1.8中ConcurrentHashMa">
+<meta property="og:type" content="article">
 <meta property="og:title" content="LuoMing&#39;s Blog">
-<meta property="og:url" content="http://yoursite.com/index.html">
+<meta property="og:url" content="http://yoursite.com/2018/02/07/[java1.8源码笔记]ConcurrentHashMap剖析/index.html">
 <meta property="og:site_name" content="LuoMing&#39;s Blog">
+<meta property="og:description" content="概述ConcurrentHashMap是HashMap的线程安全版本，可以用来替代HashTable，HashTable的线程安全是通过用synchronized关键词来修饰每个方法来实现，，即Hashtable是针对整个table的锁定，同一时刻只能有一个方法被一个线程执行，这样就导致HashTable容器在竞争激烈的并发环境下表现出效率低下。而在java1.8中ConcurrentHashMa">
 <meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="https://i.imgur.com/OFa6YCa.png">
+<meta property="og:image" content="https://i.imgur.com/Nd9BRL2.png">
+<meta property="og:image" content="https://i.imgur.com/bJ2Qw6H.png">
+<meta property="og:updated_time" content="2018-02-09T03:05:41.206Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="LuoMing&#39;s Blog">
+<meta name="twitter:description" content="概述ConcurrentHashMap是HashMap的线程安全版本，可以用来替代HashTable，HashTable的线程安全是通过用synchronized关键词来修饰每个方法来实现，，即Hashtable是针对整个table的锁定，同一时刻只能有一个方法被一个线程执行，这样就导致HashTable容器在竞争激烈的并发环境下表现出效率低下。而在java1.8中ConcurrentHashMa">
+<meta name="twitter:image" content="https://i.imgur.com/OFa6YCa.png">
 
 
 
@@ -115,13 +123,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/"/>
+  <link rel="canonical" href="http://yoursite.com/2018/02/07/[java1.8源码笔记]ConcurrentHashMap剖析/"/>
 
 
 
 
 
-  <title>LuoMing's Blog</title>
+  <title> | LuoMing's Blog</title>
   
 
 
@@ -140,8 +148,7 @@
     
   
 
-  <div class="container sidebar-position-left 
-  page-home">
+  <div class="container sidebar-position-left page-post-detail">
     <div class="headband"></div>
 
     <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
@@ -224,9 +231,9 @@
         <div class="content-wrap">
           <div id="content" class="content">
             
-  <section id="posts" class="posts-expand">
+
+  <div id="posts" class="posts-expand">
     
-      
 
   
 
@@ -256,9 +263,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2018/02/07/[java1.8源码笔记]ConcurrentHashMap剖析/" itemprop="url">未命名</a></h1>
+          <h1 class="post-title" itemprop="name headline"></h1>
         
 
         <div class="post-meta">
@@ -308,9 +313,7 @@
       
 
       
-        
-          
-            <h1 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h1><p>ConcurrentHashMap是HashMap的线程安全版本，可以用来替代HashTable，HashTable的线程安全是通过用synchronized关键词来修饰每个方法来实现，，即Hashtable是针对整个table的锁定，同一时刻只能有一个方法被一个线程执行，这样就导致HashTable容器在竞争激烈的并发环境下表现出效率低下。而在java1.8中ConcurrentHashMap通过CAS来实现非阻塞的无锁线程安全、在操作hash值相同的hash桶时用synchronized锁住链表头结点来实现线程安全，锁粒度更小，并发性更高。</p>
+        <h1 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h1><p>ConcurrentHashMap是HashMap的线程安全版本，可以用来替代HashTable，HashTable的线程安全是通过用synchronized关键词来修饰每个方法来实现，，即Hashtable是针对整个table的锁定，同一时刻只能有一个方法被一个线程执行，这样就导致HashTable容器在竞争激烈的并发环境下表现出效率低下。而在java1.8中ConcurrentHashMap通过CAS来实现非阻塞的无锁线程安全、在操作hash值相同的hash桶时用synchronized锁住链表头结点来实现线程安全，锁粒度更小，并发性更高。</p>
 <p>ConcurrentHashMap的底层与Java1.8的HashMap有相通之处，底层依然由“数组”+链表+红黑树来实现的。当发生碰撞时，用链表解决hash碰撞，当链表长度&gt;=8时，将链表转换为红黑树结构（table容量小于64时，不执行转换操作，先扩容）。</p>
 <p>ConcurrentHashMap不接受nullkey和nullvalue</p>
 <p>ConcurrentHashMap在java1.8中实现与java1.7中的区别：<br>在java1.7中，ConcurrentHashMap使用的就是分段锁技术，ConcurrentHashMap由多个Segment组成(Segment下包含很多Node，也就是我们的键值对了)，每个Segment都有把锁来实现线程安全，当一个线程占用锁访问其中一个段数据的时候，其他段的数据也能被其他线程访问。</p>
@@ -1022,8 +1025,6 @@ final long sumCount() {
     return sum;
 }
 </code></pre>
-          
-        
       
     </div>
     
@@ -1040,433 +1041,28 @@ final long sumCount() {
       
 
       
-
-      
-
       
       
-        <div class="post-eof"></div>
+
       
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/02/07/[java1.8源码笔记]CAS介绍/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="LuoMing's Blog">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2018/02/07/[java1.8源码笔记]CAS介绍/" itemprop="url">未命名</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
             
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-02-07T11:24:14+08:00">
-                2018-02-07
-              </time>
+              <a href="/2018/02/07/[java1.8源码笔记]CAS介绍/" rel="next" title="">
+                <i class="fa fa-chevron-left"></i> 
+              </a>
             
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <h1 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h1><p>CAS，在java并发应用中通常指CompareAndSwap或CompareAndSet，即比较并交换。它比较一个内存位置的值并且只有等于预期值时才修改这个内存位置的值为新的值，如果有其他线程在这期间修改了内存位置的值则CAS操作失败。CAS返回是否成功或者内存位置原来的值用于判断是否操作成功。即CAS有3个操作数，内存值V，旧的预期值A，要修改的新值B。当且仅当预期值A和内存值V相同时，将内存值V修改为B，否则什么都不做。</p>
-<p>CAS是一个原子操作，是一条CPU的原子指令，其实现方式是基于硬件平台的汇编指令，也就是说CAS是靠硬件实现的，硬件保证其操作的原子性。CAS是一种系统原语，原语属于操作系统用语范畴，是由若干条指令组成的，用于完成某个功能的一个过程，并且原语的执行必须是连续的，在执行过程中不允许被中断，也就是说CAS是一条CPU的原子指令。</p>
-<p>java.util.concurrent包完全建立在CAS之上的，其中大量使用了CAS操作，java.util.concurrent包中借助CAS实现了区别于synchronouse同步锁的一种乐观锁。一般在循环中调用CAS，直到设置成功。</p>
-<h1 id="乐观锁与悲观锁"><a href="#乐观锁与悲观锁" class="headerlink" title="乐观锁与悲观锁"></a>乐观锁与悲观锁</h1><p>悲观锁（Pessimistic Lock）：<br>每次获取数据的时候，都会担心数据被修改，所以每次获取数据的时候都会进行加锁，确保在自己使用的过程中数据不会被别人修改，使用完成后进行数据解锁。由于数据进行加锁，期间对该数据进行读写的其他线程都会进行等待。</p>
-<p>乐观锁（Optimistic Lock）：<br>每次获取数据的时候，都不会担心数据被修改，所以每次获取数据的时候都不会进行加锁，但是在更新数据的时候需要判断该数据是否被别人修改过。如果数据被其他线程修改，则不进行数据更新，如果数据没有被其他线程修改，则进行数据更新。由于数据没有进行加锁，期间该数据可以被其他线程进行读写操作。</p>
-<h1 id="Unsafe类"><a href="#Unsafe类" class="headerlink" title="Unsafe类"></a>Unsafe类</h1><p>Unsafe类存在于sun.misc包中，其内部方法操作可以像C的指针一样直接操作内存，单从名称看来就可以知道该类是非安全的，因此总是不应该首先使用Unsafe类。<strong>Java中CAS操作的执行依赖于Unsafe类的方法</strong>，注意Unsafe类中的所有方法都是native修饰的，也就是说Unsafe类中的方法都直接调用操作系统底层资源执行相应任务。</p>
-<pre><code>public class AtomicInteger extends Number implements java.io.Serializable {
-    private static final long serialVersionUID = 6214790243416807050L;
-
-    // setup to use Unsafe.compareAndSwapInt for updates
-    private static final Unsafe unsafe = Unsafe.getUnsafe();
-    private static final long valueOffset;
-
-    static {
-        try {
-            valueOffset = unsafe.objectFieldOffset
-                (AtomicInteger.class.getDeclaredField(&quot;value&quot;));
-        } catch (Exception ex) { throw new Error(ex); }
-    }
-
-    private volatile int value;
-    public final int getAndIncrement() {
-        return unsafe.getAndAddInt(this, valueOffset, 1);
-    }
-}
-
-public final int getAndAddInt(Object var1, long var2, int var4) {
-    int var5;
-    do {
-        var5 = this.getIntVolatile(var1, var2);
-    } while(!this.compareAndSwapInt(var1, var2, var5, var5 + var4));
-
-    return var5;
-}
-</code></pre><p>compareAndSwapInt是一个本地方法调用，在intel x86处理器中是通过cmpxchg指令实现。</p>
-<h1 id="CAS的ABA问题"><a href="#CAS的ABA问题" class="headerlink" title="CAS的ABA问题"></a>CAS的ABA问题</h1><p>因为CAS需要在操作值的时候检查下值有没有发生变化，如果没有发生变化则更新，但是如果一个值原来是A，变成了B，又变成了A，那么使用CAS进行检查时会发现它的值没有发生变化，但是实际上却变化了。</p>
-<p>在Java中解决ABA问题，我们可以使用以下两个原子类</p>
-<ul>
-<li><p>AtomicStampedReference</p>
-<p>  AtomicStampedReference原子类是一个带有时间戳的对象引用，在每次修改后，AtomicStampedReference不仅会设置新值而且还会记录更改的时间。当AtomicStampedReference设置对象值时，对象值以及时间戳都必须满足期望值才能写入成功，这也就解决了反复读写时，无法预知值是否已被修改的窘境，</p>
-</li>
-<li><p>AtomicMarkableReference类</p>
-<p>  AtomicMarkableReference与AtomicStampedReference不同的是，AtomicMarkableReference维护的是一个boolean值的标识，也就是说至于true和false两种切换状态</p>
-</li>
-</ul>
-<h1 id="参考链接"><a href="#参考链接" class="headerlink" title="参考链接"></a>参考链接</h1><p>[1] <a href="http://blog.csdn.net/javazejian/article/details/72772470" target="_blank" rel="noopener">http://blog.csdn.net/javazejian/article/details/72772470</a></p>
-<p>[2] <a href="http://www.jianshu.com/p/fb6e91b013cc" target="_blank" rel="noopener">http://www.jianshu.com/p/fb6e91b013cc</a></p>
-<p>[3] <a href="http://blog.sina.com.cn/s/blog_ee34aa660102wsuv.html" target="_blank" rel="noopener">http://blog.sina.com.cn/s/blog_ee34aa660102wsuv.html</a></p>
-<p>[4] <a href="https://liuzhengyang.github.io/2017/05/11/cas/" target="_blank" rel="noopener">https://liuzhengyang.github.io/2017/05/11/cas/</a></p>
-<p>[5] <a href="http://zl198751.iteye.com/blog/1848575" target="_blank" rel="noopener">http://zl198751.iteye.com/blog/1848575</a></p>
-
-          
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/01/20/hexo-github搭建博客/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="LuoMing's Blog">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2018/01/20/hexo-github搭建博客/" itemprop="url">hexo+github搭建博客</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-01-20T15:23:14+08:00">
-                2018-01-20
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          <h1 id="安装相关工具"><a href="#安装相关工具" class="headerlink" title="安装相关工具"></a>安装相关工具</h1><h2 id="1、安装Node-js"><a href="#1、安装Node-js" class="headerlink" title="1、安装Node.js"></a>1、安装Node.js</h2><p><a href="https://nodejs.org/dist/v7.4.0/node-v7.4.0-x86.msi" target="_blank" rel="noopener">https://nodejs.org/dist/v7.4.0/node-v7.4.0-x86.msi</a> <br><br><a href="https://nodejs.org/dist/v7.4.0/node-v7.4.0-x64.msi" target="_blank" rel="noopener">https://nodejs.org/dist/v7.4.0/node-v7.4.0-x64.msi</a></p>
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2018/01/20/hexo-github搭建博客/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
           </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
 
-    
+          <span class="post-nav-divider"></span>
 
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/01/20/hello-world/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="John Doe">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="LuoMing's Blog">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2018/01/20/hello-world/" itemprop="url">Hello World</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
+          <div class="post-nav-prev post-nav-item">
             
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-01-20T14:55:56+08:00">
-                2018-01-20
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
+          </div>
         </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
       
 
       
-        
-          
-            <p>Welcome to <a href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="noopener">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="noopener">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="noopener">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">"My New Post"</span></span><br></pre></td></tr></table></figure>
-<p>More info: <a href="https://hexo.io/docs/writing.html" target="_blank" rel="noopener">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-<p>More info: <a href="https://hexo.io/docs/server.html" target="_blank" rel="noopener">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-<p>More info: <a href="https://hexo.io/docs/generating.html" target="_blank" rel="noopener">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-<p>More info: <a href="https://hexo.io/docs/deployment.html" target="_blank" rel="noopener">Deployment</a></p>
-
-          
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
       
     </footer>
   </div>
@@ -1476,10 +1072,11 @@ public final int getAndAddInt(Object var1, long var2, int var4) {
   </article>
 
 
-    
-  </section>
 
-  
+    <div class="post-spread">
+      
+    </div>
+  </div>
 
 
           </div>
@@ -1487,6 +1084,10 @@ public final int getAndAddInt(Object var1, long var2, int var4) {
 
 
           
+
+  
+
+
 
         </div>
         
@@ -1507,8 +1108,17 @@ public final int getAndAddInt(Object var1, long var2, int var4) {
       
 
       
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
 
-      <section class="site-overview-wrap sidebar-panel sidebar-panel-active">
+      <section class="site-overview-wrap sidebar-panel">
         <div class="site-overview">
           <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
             
@@ -1559,6 +1169,22 @@ public final int getAndAddInt(Object var1, long var2, int var4) {
         </div>
       </section>
 
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#概述"><span class="nav-number">1.</span> <span class="nav-text">概述</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#部分相关内部类介绍"><span class="nav-number">2.</span> <span class="nav-text">部分相关内部类介绍</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Node"><span class="nav-number">2.1.</span> <span class="nav-text">Node</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ForwardingNode"><span class="nav-number">2.2.</span> <span class="nav-text">ForwardingNode</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#TreeNode"><span class="nav-number">2.3.</span> <span class="nav-text">TreeNode</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#TreeBin"><span class="nav-number">2.4.</span> <span class="nav-text">TreeBin</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#初始化"><span class="nav-number">3.</span> <span class="nav-text">初始化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#相关成员属性介绍"><span class="nav-number">3.1.</span> <span class="nav-text">相关成员属性介绍</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#源码分析"><span class="nav-number">3.2.</span> <span class="nav-text">源码分析</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#插入操作-put"><span class="nav-number">4.</span> <span class="nav-text">插入操作-put</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#相关成员属性介绍-1"><span class="nav-number">4.1.</span> <span class="nav-text">相关成员属性介绍</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#源码分析-1"><span class="nav-number">4.2.</span> <span class="nav-text">源码分析</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#扩容与辅助扩容"><span class="nav-number">5.</span> <span class="nav-text">扩容与辅助扩容</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#相关成员属性介绍-2"><span class="nav-number">5.1.</span> <span class="nav-text">相关成员属性介绍</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#源码分析-2"><span class="nav-number">5.2.</span> <span class="nav-text">源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#rehash过程"><span class="nav-number">5.2.1.</span> <span class="nav-text">rehash过程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#辅助扩容"><span class="nav-number">5.2.2.</span> <span class="nav-text">辅助扩容</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#获取操作–get-函数实现"><span class="nav-number">6.</span> <span class="nav-text">获取操作–get()函数实现</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#计数–size-函数实现"><span class="nav-number">7.</span> <span class="nav-text">计数–size()函数实现</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#相关成员属性介绍-3"><span class="nav-number">7.1.</span> <span class="nav-text">相关成员属性介绍</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#源码分析-3"><span class="nav-number">7.2.</span> <span class="nav-text">源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#增加或减少计数"><span class="nav-number">7.2.1.</span> <span class="nav-text">增加或减少计数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#统计元素个数"><span class="nav-number">7.2.2.</span> <span class="nav-text">统计元素个数</span></a></li></ol></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
       
 
       
@@ -1692,6 +1318,10 @@ public final int getAndAddInt(Object var1, long var2, int var4) {
   
 
   
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
 
   
 
