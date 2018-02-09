@@ -5,7 +5,7 @@
   
 
 
-<html class="theme-next muse use-motion" lang="zh-Hans">
+<html class="theme-next pisces use-motion" lang="zh-Hans">
 <head>
   <meta charset="UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=edge" />
@@ -87,7 +87,7 @@
 <meta property="og:site_name" content="LuoMing&#39;s Blog">
 <meta property="og:description" content="概述CAS，在java并发应用中通常指CompareAndSwap或CompareAndSet，即比较并交换。它比较一个内存位置的值并且只有等于预期值时才修改这个内存位置的值为新的值，如果有其他线程在这期间修改了内存位置的值则CAS操作失败。CAS返回是否成功或者内存位置原来的值用于判断是否操作成功。即CAS有3个操作数，内存值V，旧的预期值A，要修改的新值B。当且仅当预期值A和内存值V相同时，将">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2018-02-09T06:22:58.460Z">
+<meta property="og:updated_time" content="2018-02-09T06:54:23.035Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="[java1.8源码笔记]CAS介绍">
 <meta name="twitter:description" content="概述CAS，在java并发应用中通常指CompareAndSwap或CompareAndSet，即比较并交换。它比较一个内存位置的值并且只有等于预期值时才修改这个内存位置的值为新的值，如果有其他线程在这期间修改了内存位置的值则CAS操作失败。CAS返回是否成功或者内存位置原来的值用于判断是否操作成功。即CAS有3个操作数，内存值V，旧的预期值A，要修改的新值B。当且仅当预期值A和内存值V相同时，将">
@@ -98,7 +98,7 @@
   var NexT = window.NexT || {};
   var CONFIG = {
     root: '/',
-    scheme: 'Muse',
+    scheme: 'Pisces',
     version: '5.1.4',
     sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
     fancybox: true,
@@ -282,6 +282,28 @@
             
           </span>
 
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/java1-8源码笔记/" itemprop="url" rel="index">
+                    <span itemprop="name">java1.8源码笔记</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
           
 
           
@@ -491,6 +513,15 @@ public final int getAndAddInt(Object var1, long var2, int var4) {
             
 
             
+              
+              
+              <div class="site-state-item site-state-categories">
+                
+                  <span class="site-state-item-count">1</span>
+                  <span class="site-state-item-name">分类</span>
+                
+              </div>
+            
 
             
               
@@ -568,7 +599,7 @@ public final int getAndAddInt(Object var1, long var2, int var4) {
 
 
 
-  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
 
 
 
@@ -667,6 +698,13 @@ public final int getAndAddInt(Object var1, long var2, int var4) {
 
   
   
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
 
   
   <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
