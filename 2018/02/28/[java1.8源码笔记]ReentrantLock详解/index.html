@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT" />
+  <meta name="keywords" content="ReentrantLock,公平锁,非公平锁,互斥锁," />
 
 
 
@@ -79,18 +79,19 @@
 
 
 
-<meta name="description" content="概述ReentrantLock是java并发包中实现的可重入互斥锁，基于AQS实现，支持公平锁与非公平锁两种实现方式。公平锁是指当同步等待队列中有线程在排队获取锁时，新加入的准备获取锁的线程则加入同步等待队列尾；非公平锁是指新加入的准备获取锁的线程，不管同步等待队列中是否有线程正在排队，而直接先尝试获取锁，如果获取失败则加入同步等待队列尾。 内部类ReentrantLock有三个内部类，其中Syn">
+<meta name="description" content="概述ReentrantLock是java并发包中实现的可重入互斥锁，基于AQS实现，支持公平锁与非公平锁两种实现方式。公平锁是指当同步等待队列中有线程在排队获取锁时，新加入的准备获取锁的线程则加入同步等待队列尾；非公平锁是指新加入的准备获取锁的线程，不管同步等待队列中是否有线程正在排队，而直接先尝试获取锁，如果获取失败则加入同步等待队列尾。">
+<meta name="keywords" content="ReentrantLock,公平锁,非公平锁,互斥锁">
 <meta property="og:type" content="article">
 <meta property="og:title" content="[java1.8源码笔记]ReentrantLock详解">
 <meta property="og:url" content="http://yoursite.com/2018/02/28/[java1.8源码笔记]ReentrantLock详解/index.html">
 <meta property="og:site_name" content="LuoMing&#39;s Blog">
-<meta property="og:description" content="概述ReentrantLock是java并发包中实现的可重入互斥锁，基于AQS实现，支持公平锁与非公平锁两种实现方式。公平锁是指当同步等待队列中有线程在排队获取锁时，新加入的准备获取锁的线程则加入同步等待队列尾；非公平锁是指新加入的准备获取锁的线程，不管同步等待队列中是否有线程正在排队，而直接先尝试获取锁，如果获取失败则加入同步等待队列尾。 内部类ReentrantLock有三个内部类，其中Syn">
+<meta property="og:description" content="概述ReentrantLock是java并发包中实现的可重入互斥锁，基于AQS实现，支持公平锁与非公平锁两种实现方式。公平锁是指当同步等待队列中有线程在排队获取锁时，新加入的准备获取锁的线程则加入同步等待队列尾；非公平锁是指新加入的准备获取锁的线程，不管同步等待队列中是否有线程正在排队，而直接先尝试获取锁，如果获取失败则加入同步等待队列尾。">
 <meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="https://i.imgur.com/T3M1gFU.png">
-<meta property="og:updated_time" content="2018-02-28T11:40:56.380Z">
+<meta property="og:updated_time" content="2018-02-28T11:51:13.785Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="[java1.8源码笔记]ReentrantLock详解">
-<meta name="twitter:description" content="概述ReentrantLock是java并发包中实现的可重入互斥锁，基于AQS实现，支持公平锁与非公平锁两种实现方式。公平锁是指当同步等待队列中有线程在排队获取锁时，新加入的准备获取锁的线程则加入同步等待队列尾；非公平锁是指新加入的准备获取锁的线程，不管同步等待队列中是否有线程正在排队，而直接先尝试获取锁，如果获取失败则加入同步等待队列尾。 内部类ReentrantLock有三个内部类，其中Syn">
+<meta name="twitter:description" content="概述ReentrantLock是java并发包中实现的可重入互斥锁，基于AQS实现，支持公平锁与非公平锁两种实现方式。公平锁是指当同步等待队列中有线程在排队获取锁时，新加入的准备获取锁的线程则加入同步等待队列尾；非公平锁是指新加入的准备获取锁的线程，不管同步等待队列中是否有线程正在排队，而直接先尝试获取锁，如果获取失败则加入同步等待队列尾。">
 <meta name="twitter:image" content="https://i.imgur.com/T3M1gFU.png">
 
 
@@ -284,6 +285,28 @@
           </span>
 
           
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/java1-8源码笔记/" itemprop="url" rel="index">
+                    <span itemprop="name">java1.8源码笔记</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
 
           
             
@@ -323,6 +346,7 @@
 
       
         <h1 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h1><p>ReentrantLock是java并发包中实现的可重入互斥锁，基于AQS实现，支持公平锁与非公平锁两种实现方式。公平锁是指当同步等待队列中有线程在排队获取锁时，新加入的准备获取锁的线程则加入同步等待队列尾；非公平锁是指新加入的准备获取锁的线程，不管同步等待队列中是否有线程正在排队，而直接先尝试获取锁，如果获取失败则加入同步等待队列尾。</p>
+<a id="more"></a>
 <h1 id="内部类"><a href="#内部类" class="headerlink" title="内部类"></a>内部类</h1><p>ReentrantLock有三个内部类，其中Sync继承于AbstractQueuedSynchronizer；NonfairSync和FairSync则均继承于Sync分别用于实现非公平锁和公平锁。类依赖图如下所示：<br><img src="https://i.imgur.com/T3M1gFU.png" alt=""></p>
 <h2 id="Sync类"><a href="#Sync类" class="headerlink" title="Sync类"></a>Sync类</h2><pre><code>abstract static class Sync extends AbstractQueuedSynchronizer {
     private static final long serialVersionUID = -5179523762034025860L;
@@ -484,6 +508,20 @@
 </blockquote>
 </li>
 </ul>
+<h1 id="常见方法"><a href="#常见方法" class="headerlink" title="常见方法"></a>常见方法</h1><ul>
+<li>public void lock();<blockquote>
+<p>获取锁</p>
+</blockquote>
+</li>
+<li>public void unlock();<blockquote>
+<p>释放锁</p>
+</blockquote>
+</li>
+<li>public Condition newCondition();<blockquote>
+<p>新建一个Condition对象</p>
+</blockquote>
+</li>
+</ul>
 
       
     </div>
@@ -498,6 +536,18 @@
     
 
     <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/ReentrantLock/" rel="tag"># ReentrantLock</a>
+          
+            <a href="/tags/公平锁/" rel="tag"># 公平锁</a>
+          
+            <a href="/tags/非公平锁/" rel="tag"># 非公平锁</a>
+          
+            <a href="/tags/互斥锁/" rel="tag"># 互斥锁</a>
+          
+        </div>
       
 
       
@@ -615,7 +665,7 @@
               
               <div class="site-state-item site-state-tags">
                 
-                  <span class="site-state-item-count">7</span>
+                  <span class="site-state-item-count">11</span>
                   <span class="site-state-item-name">标签</span>
                 
               </div>
@@ -648,7 +698,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#概述"><span class="nav-number">1.</span> <span class="nav-text">概述</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#内部类"><span class="nav-number">2.</span> <span class="nav-text">内部类</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Sync类"><span class="nav-number">2.1.</span> <span class="nav-text">Sync类</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NonfairSync类"><span class="nav-number">2.2.</span> <span class="nav-text">NonfairSync类</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#FairSync类"><span class="nav-number">2.3.</span> <span class="nav-text">FairSync类</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#构造函数"><span class="nav-number">3.</span> <span class="nav-text">构造函数</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#概述"><span class="nav-number">1.</span> <span class="nav-text">概述</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#内部类"><span class="nav-number">2.</span> <span class="nav-text">内部类</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Sync类"><span class="nav-number">2.1.</span> <span class="nav-text">Sync类</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NonfairSync类"><span class="nav-number">2.2.</span> <span class="nav-text">NonfairSync类</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#FairSync类"><span class="nav-number">2.3.</span> <span class="nav-text">FairSync类</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#构造函数"><span class="nav-number">3.</span> <span class="nav-text">构造函数</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#常见方法"><span class="nav-number">4.</span> <span class="nav-text">常见方法</span></a></li></ol></div>
             
 
           </div>
