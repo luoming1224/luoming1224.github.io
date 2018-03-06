@@ -88,7 +88,7 @@
 <meta property="og:description" content="概述我们都知道线程的创建和销毁过程开销比较大，如果并发的线程数量很多，并且每个线程都是执行一个时间很短的任务就结束了，这样频繁创建线程就会大大降低系统的效率，此时推荐使用线程池来复用线程，使得线程执行完一个任务并不被销毁，而是继续执行其他任务。然而线程池的实现相对比较复杂，于是java并发包中帮我们实现了一个功能强大的线程池。java线程池负责管理工作线程，包含一个等待执行的任务队列。线程池的任务">
 <meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="https://i.imgur.com/BAHp4RC.png">
-<meta property="og:updated_time" content="2018-03-05T09:05:19.704Z">
+<meta property="og:updated_time" content="2018-03-06T08:50:04.094Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="[java学习笔记]java线程池">
 <meta name="twitter:description" content="概述我们都知道线程的创建和销毁过程开销比较大，如果并发的线程数量很多，并且每个线程都是执行一个时间很短的任务就结束了，这样频繁创建线程就会大大降低系统的效率，此时推荐使用线程池来复用线程，使得线程执行完一个任务并不被销毁，而是继续执行其他任务。然而线程池的实现相对比较复杂，于是java并发包中帮我们实现了一个功能强大的线程池。java线程池负责管理工作线程，包含一个等待执行的任务队列。线程池的任务">
@@ -346,6 +346,7 @@
 
       
         <h1 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h1><p>我们都知道线程的创建和销毁过程开销比较大，如果并发的线程数量很多，并且每个线程都是执行一个时间很短的任务就结束了，这样频繁创建线程就会大大降低系统的效率，此时推荐使用线程池来复用线程，使得线程执行完一个任务并不被销毁，而是继续执行其他任务。然而线程池的实现相对比较复杂，于是java并发包中帮我们实现了一个功能强大的线程池。java线程池负责管理工作线程，包含一个等待执行的任务队列。线程池的任务队列是一个Runnable集合，工作线程负责从任务队列中取出并执行Runnable对象。</p>
+<a id="more"></a>
 <p>在java线程池的使用过程中涉及Executors、Executor、ExecutorService等几个类</p>
 <h1 id="创建线程池"><a href="#创建线程池" class="headerlink" title="创建线程池"></a>创建线程池</h1><p>在java中Executors类中提供了负责生成各种类型的线程池的实例的静态方法，主要有四种类型：固定大小线程池、可变大小线程池、单任务线程池、周期性执行的线程池</p>
 <h2 id="固定大小线程池"><a href="#固定大小线程池" class="headerlink" title="固定大小线程池"></a>固定大小线程池</h2><p>生成固定大小线程池的静态方法</p>
