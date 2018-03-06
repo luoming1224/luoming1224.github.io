@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="线程池," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="概述我们都知道线程的创建和销毁过程开销比较大，如果并发的线程数量很多，并且每个线程都是执行一个时间很短的任务就结束了，这样频繁创建线程就会大大降低系统的效率，此时推荐使用线程池来复用线程，使得线程执行完一个任务并不被销毁，而是继续执行其他任务。然而线程池的实现相对比较复杂，于是java并发包中帮我们实现了一个功能强大的线程池。java线程池负责管理工作线程，包含一个等待执行的任务队列。线程池的任务">
+<meta name="keywords" content="线程池">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[java学习笔记]java线程池">
+<meta property="og:url" content="http://yoursite.com/2018/03/02/[java学习笔记]java线程池/index.html">
+<meta property="og:site_name" content="LuoMing&#39;s Blog">
+<meta property="og:description" content="概述我们都知道线程的创建和销毁过程开销比较大，如果并发的线程数量很多，并且每个线程都是执行一个时间很短的任务就结束了，这样频繁创建线程就会大大降低系统的效率，此时推荐使用线程池来复用线程，使得线程执行完一个任务并不被销毁，而是继续执行其他任务。然而线程池的实现相对比较复杂，于是java并发包中帮我们实现了一个功能强大的线程池。java线程池负责管理工作线程，包含一个等待执行的任务队列。线程池的任务">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="https://i.imgur.com/BAHp4RC.png">
+<meta property="og:updated_time" content="2018-03-05T09:05:19.704Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="[java学习笔记]java线程池">
+<meta name="twitter:description" content="概述我们都知道线程的创建和销毁过程开销比较大，如果并发的线程数量很多，并且每个线程都是执行一个时间很短的任务就结束了，这样频繁创建线程就会大大降低系统的效率，此时推荐使用线程池来复用线程，使得线程执行完一个任务并不被销毁，而是继续执行其他任务。然而线程池的实现相对比较复杂，于是java并发包中帮我们实现了一个功能强大的线程池。java线程池负责管理工作线程，包含一个等待执行的任务队列。线程池的任务">
+<meta name="twitter:image" content="https://i.imgur.com/BAHp4RC.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2018/03/02/[java学习笔记]java线程池/"/>
+
+
+
+
+
+  <title>[java学习笔记]java线程池 | LuoMing's Blog</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">LuoMing's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">小白成长记</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/03/02/[java学习笔记]java线程池/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="罗明">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="LuoMing's Blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">[java学习笔记]java线程池</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-03-02T17:05:43+08:00">
+                2018-03-02
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/java学习笔记/" itemprop="url" rel="index">
+                    <span itemprop="name">java学习笔记</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2018/03/02/[java学习笔记]java线程池/" class="leancloud_visitors" data-flag-title="[java学习笔记]java线程池">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数&#58;</span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h1 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h1><p>我们都知道线程的创建和销毁过程开销比较大，如果并发的线程数量很多，并且每个线程都是执行一个时间很短的任务就结束了，这样频繁创建线程就会大大降低系统的效率，此时推荐使用线程池来复用线程，使得线程执行完一个任务并不被销毁，而是继续执行其他任务。然而线程池的实现相对比较复杂，于是java并发包中帮我们实现了一个功能强大的线程池。java线程池负责管理工作线程，包含一个等待执行的任务队列。线程池的任务队列是一个Runnable集合，工作线程负责从任务队列中取出并执行Runnable对象。</p>
+<p>在java线程池的使用过程中涉及Executors、Executor、ExecutorService等几个类</p>
+<h1 id="创建线程池"><a href="#创建线程池" class="headerlink" title="创建线程池"></a>创建线程池</h1><p>在java中Executors类中提供了负责生成各种类型的线程池的实例的静态方法，主要有四种类型：固定大小线程池、可变大小线程池、单任务线程池、周期性执行的线程池</p>
+<h2 id="固定大小线程池"><a href="#固定大小线程池" class="headerlink" title="固定大小线程池"></a>固定大小线程池</h2><p>生成固定大小线程池的静态方法</p>
+<ul>
+<li>public static ExecutorService newFixedThreadPool(int nThreads)</li>
+<li>public static ExecutorService newFixedThreadPool(int nThreads, ThreadFactory threadFactory)</li>
+</ul>
+<p>创建的线程池包含nThreads个固定数量的线程</p>
+<h2 id="可变大小线程池"><a href="#可变大小线程池" class="headerlink" title="可变大小线程池"></a>可变大小线程池</h2><p>生成可变大小线程池的静态方法</p>
+<ul>
+<li>public static ExecutorService newCachedThreadPool()</li>
+<li>public static ExecutorService newCachedThreadPool(ThreadFactory threadFactory)</li>
+</ul>
+<p>创建的线程池包含最少0个，最多Integer.MAX_VALUE = 0x7fffffff 个线程，空闲线程存活时间为60秒，即空闲线程60秒没有获取到任务后就会关闭</p>
+<h2 id="单任务线程池"><a href="#单任务线程池" class="headerlink" title="单任务线程池"></a>单任务线程池</h2><p>生成单任务线程池的静态方法</p>
+<ul>
+<li>public static ExecutorService newSingleThreadExecutor()</li>
+<li>public static ExecutorService newSingleThreadExecutor(ThreadFactory threadFactory)</li>
+</ul>
+<p>创建的线程池包含一个工作线程</p>
+<ul>
+<li>public static ScheduledExecutorService newSingleThreadScheduledExecutor()</li>
+<li>public static ScheduledExecutorService newSingleThreadScheduledExecutor(ThreadFactory threadFactory)</li>
+</ul>
+<p>创建包含一个工作线程的线程池，且周期性的执行任务</p>
+<h2 id="周期性执行的线程池"><a href="#周期性执行的线程池" class="headerlink" title="周期性执行的线程池"></a>周期性执行的线程池</h2><ul>
+<li>public static ScheduledExecutorService newScheduledThreadPool(int corePoolSize)</li>
+<li>public static ScheduledExecutorService newScheduledThreadPool(<pre><code>int corePoolSize, ThreadFactory threadFactory)
+</code></pre></li>
+</ul>
+<p>该方法的返回值ScheduledExecutorService有四个成员函数用于执行任务：</p>
+<p>（1）public ScheduledFuture&lt;?&gt; schedule(Runnable command, long delay, TimeUnit unit);</p>
+<p>（2）public <v> ScheduledFuture<v> schedule(Callable<v> callable, long delay, TimeUnit unit);</v></v></v></p>
+<p>（3）public ScheduledFuture&lt;?&gt; scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit);</p>
+<blockquote>
+<p>在上一个任务开始执行之后延迟多少秒之后再执行，是从上一个任务开始时开始计算</p>
+<p>如果延迟时间比任务执行时间短，还是会等到上一个任务执行完成之后，下一个任务才开始执行</p>
+</blockquote>
+<p>（4）public ScheduledFuture&lt;?&gt; scheduleWithFixedDelay(Runnable command, long initialDelay, long delay, TimeUnit unit);</p>
+<blockquote>
+<p>在上一个任务执行结束之后，延迟多少秒之后再执行，是从上一个任务结束时开始计算</p>
+</blockquote>
+<p>可以用如下简单的示例，观察打印结果，加深对以上两种周期性延迟任务的差别</p>
+<pre><code>ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
+scheduler.scheduleAtFixedRate(new Runnable() {
+    @Override
+    public void run() {
+        System.out.println(&quot;scheduleAtFixedRate:    &quot; + new Date());
+        try {
+            TimeUnit.SECONDS.sleep(1);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}, 1, 3L , SECONDS);
+
+scheduler.scheduleWithFixedDelay(new Runnable() {
+    @Override
+    public void run() {
+        System.out.println(&quot;scheduleWithFixedDelay: &quot; + new Date());
+        try {
+            TimeUnit.SECONDS.sleep(1);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}, 1, 3L , SECONDS);
+</code></pre><h1 id="管理线程池"><a href="#管理线程池" class="headerlink" title="管理线程池"></a>管理线程池</h1><p>在Executor类及其子类ExecutorService、ScheduledExecutorService中提供了向线程池提交和执行任务的方法，三者之间的继承关系如下图所示：</p>
+<p><img src="https://i.imgur.com/BAHp4RC.png" alt=""></p>
+<p>其中ScheduledExecutorService提供了向周期性任务线程池提交任务的方法，具体介绍和示例见上面；在Executor和ExecutorService中提供的主要方法有：</p>
+<ul>
+<li>void execute(Runnable command);</li>
+<li><t> Future<t> submit(Callable<t> task);</t></t></t></li>
+<li><t> Future<t> submit(Runnable task, T result);</t></t></li>
+<li>Future&lt;?&gt; submit(Runnable task);</li>
+</ul>
+<blockquote>
+<p>execute(Runnable x) 没有返回值。可以执行任务，但无法判断任务是否成功完成。<br>submit(Runnable x) 返回一个future。可以用这个future来判断任务是否成功完成。</p>
+</blockquote>
+<p>而且函数的参数可以是Runnable或者Callable<t>，两者都可以用于将耗时操作写在其中，然后使用某个线程去执行，即可实现多线程；两者的区别为：Runnable有一个run()函数，该函数没有返回值，不能将结果返回给客户程序，Callable中有一个call()函数，但是call()函数有返回值，可以通过Future类的get()函数获得线程执行的返回值。</t></p>
+<h1 id="自定义线程池及参数说明"><a href="#自定义线程池及参数说明" class="headerlink" title="自定义线程池及参数说明"></a>自定义线程池及参数说明</h1><p>通过查看java1.8源码可以发现，在Executors类中创建各类线程池的方法都是由ThreadPoolExecutor实现，所以我们自己也可以直接调用ThreadPoolExecutor构造函数自定义创建线程池。这种方式并不推荐使用，因为对于开发者来说比较困难，也不好管理和维护，但这种方式可以做到对线程池更细致更自由化的控制。</p>
+<p>ThreadPoolExecutor类的构造函数接受以下这几个重要的参数：</p>
+<ul>
+<li>corePoolSize：线程池基本数量</li>
+<li>workQueue：用于保存等待执行的任务的阻塞队列。阻塞队列的类型可自己选择，阻塞有这几种类型，ArrayBlockingQueue(基于数组的有界阻塞队列，按FIFO进出任务)，LinkedBlockingQueue(基于链表的阻塞队列，FIFO方式)，SynchronousQueue(不存储元素的阻塞队列。每个插入操作必须等到另一个线程调用移除操作，否则插入操作一直处于阻塞状态，吞吐量要高于LinkedBlockingQueue，是一个无限阻塞队列)，PriorityBlockingQueue(具有优先级的无限阻塞队列)</li>
+<li>maximunPoolSize：线程池最大数量，也就是线程池允许创建的最大线程数。这个参数跟阻塞队列的关系是这样的：如果阻塞队列满了，这个时候又来了一个任务，那么这个时候如果当前线程数小于最大数量，那么就会直接创建新的线程执行任务。当然，如果工作队列是无界的，那么这个参数就没有意义了，因为队列无界，任务都会在队列中存储着</li>
+<li>ThreadFactory：创建线程的工厂</li>
+<li>RejectedExecutionHandler：饱和策略，也就是当队列和线程数目都满了以后，采取的策略。有AbortPolicy(直接抛出异常)，CallerRunsPolicy(只用调用者所在线程来运行任务)，DiscardOldestPolicy(丢弃队列里最近的一个任务，并执行当前任务)，DiscardPolicy(不处理，直接丢弃)。当然，还可以自定义策略</li>
+<li>keeyAliveTime：存活时间。如果当前线程池中的线程数量比基本数量要多，并且是闲置状态的话，这些闲置的线程能存活的最大时间</li>
+<li>TimeUnit，跟第6个参数一起使用，表示存活时间的时间单位</li>
+</ul>
+<p>这些参数中，有3个参数跟线程池大小有关，分别是基本数量，最大数量和阻塞队列。</p>
+<h1 id="线程池的处理流程"><a href="#线程池的处理流程" class="headerlink" title="线程池的处理流程"></a>线程池的处理流程</h1><ol>
+<li>首先判断线程池的基本大小，如果基本大小还没满，那么直接创建新的线程执行任务，否则进行下一步</li>
+<li>判断线程池中的阻塞队列是是否已满，没满的话存到阻塞队列里等待执行，否则执行下一步(所以如果是个无界的阻塞队列，那么这一步永远都成立)</li>
+<li>判断线程池最大大小是否已满，没满的话直接创建线程执行任务，否则交给饱和策略处理</li>
+</ol>
+<p>通过如下示例来理解线程池的处理流程：</p>
+<pre><code>public static void main(String[] args) {
+    ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(1, 20, 10, TimeUnit.SECONDS,new LinkedBlockingQueue(10));
+
+    for(int i = 0; i &lt; 15; i ++) {
+        threadPoolExecutor.submit(new MyThread(i + 1));
+    }
+}
+
+static class MyThread implements Runnable {
+    private int index;
+    public MyThread(int index) {
+        this.index = index;
+    }
+    @Override
+    public void run() {
+        System.out.println(this.index);
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+</code></pre><p>执行该示例，我们可以看到，线程池先创建一个线程打印1；接着由于线程池基本大小为1，队列大小为10，于是将2-11缓存进队列中；队列满后，由于线程池最大大小为20，于是接着创建4个线程，打印12-15；此时线程池中有5个线程，5个线程完成当前任务后，从队列中获取任务来执行；当队列中的任务都执行完毕后，超过10秒钟没有可执行的任务的话，有4个线程会被线程池关闭，最终保留1个基本大小的线程。</p>
+<h1 id="参考链接"><a href="#参考链接" class="headerlink" title="参考链接"></a>参考链接</h1><p>[1] <a href="http://fangjian0423.github.io/2015/07/24/java-poolthread/" target="_blank" rel="noopener">http://fangjian0423.github.io/2015/07/24/java-poolthread/</a></p>
+<p>[2] <a href="http://blog.csdn.net/bboyfeiyu/article/details/24851847" target="_blank" rel="noopener">http://blog.csdn.net/bboyfeiyu/article/details/24851847</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/线程池/" rel="tag"># 线程池</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/03/01/[java1.8源码笔记]ReentrantReadWriteLock详解/" rel="next" title="[java1.8源码笔记]ReentrantReadWriteLock详解">
+                <i class="fa fa-chevron-left"></i> [java1.8源码笔记]ReentrantReadWriteLock详解
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2018/03/05/[java1-8源码笔记]ThreadPoolExecutor详解/" rel="prev" title="[java1.8源码笔记]ThreadPoolExecutor详解">
+                [java1.8源码笔记]ThreadPoolExecutor详解 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">罗明</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">7</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">15</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#概述"><span class="nav-number">1.</span> <span class="nav-text">概述</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#创建线程池"><span class="nav-number">2.</span> <span class="nav-text">创建线程池</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#固定大小线程池"><span class="nav-number">2.1.</span> <span class="nav-text">固定大小线程池</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#可变大小线程池"><span class="nav-number">2.2.</span> <span class="nav-text">可变大小线程池</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#单任务线程池"><span class="nav-number">2.3.</span> <span class="nav-text">单任务线程池</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#周期性执行的线程池"><span class="nav-number">2.4.</span> <span class="nav-text">周期性执行的线程池</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#管理线程池"><span class="nav-number">3.</span> <span class="nav-text">管理线程池</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#自定义线程池及参数说明"><span class="nav-number">4.</span> <span class="nav-text">自定义线程池及参数说明</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#线程池的处理流程"><span class="nav-number">5.</span> <span class="nav-text">线程池的处理流程</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#参考链接"><span class="nav-number">6.</span> <span class="nav-text">参考链接</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2018</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">罗明</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.4.js"></script>
+  <script>AV.initialize("dsyBwqQYMTnV1RK3gWMNH29r-gzGzoHsz", "41tkvjbnAlNL7Tk0VyIBizQ6");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
