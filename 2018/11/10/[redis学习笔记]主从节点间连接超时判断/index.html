@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="redis,主从复制超时," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="redis主从节点之间会建立一个连接用于复制数据，该连接由从节点收到slave of命令或者cluster replicate（集群模式下）后发起建立到主节点的连接，主从节点均会定时判断该连接是否超时（这个判断过程在replicationCron函数中实现），如果被判断超时，会断开该连接，从节点需要重新建立连接，继续同步数据。">
+<meta name="keywords" content="redis,主从复制超时">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[redis学习笔记]主从节点间连接超时判断">
+<meta property="og:url" content="http://yoursite.com/2018/11/10/[redis学习笔记]主从节点间连接超时判断/index.html">
+<meta property="og:site_name" content="LuoMing&#39;s Blog">
+<meta property="og:description" content="redis主从节点之间会建立一个连接用于复制数据，该连接由从节点收到slave of命令或者cluster replicate（集群模式下）后发起建立到主节点的连接，主从节点均会定时判断该连接是否超时（这个判断过程在replicationCron函数中实现），如果被判断超时，会断开该连接，从节点需要重新建立连接，继续同步数据。">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2018-11-10T14:41:46.073Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="[redis学习笔记]主从节点间连接超时判断">
+<meta name="twitter:description" content="redis主从节点之间会建立一个连接用于复制数据，该连接由从节点收到slave of命令或者cluster replicate（集群模式下）后发起建立到主节点的连接，主从节点均会定时判断该连接是否超时（这个判断过程在replicationCron函数中实现），如果被判断超时，会断开该连接，从节点需要重新建立连接，继续同步数据。">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2018/11/10/[redis学习笔记]主从节点间连接超时判断/"/>
+
+
+
+
+
+  <title>[redis学习笔记]主从节点间连接超时判断 | LuoMing's Blog</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">LuoMing's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">小白成长记</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/11/10/[redis学习笔记]主从节点间连接超时判断/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="罗明">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="LuoMing's Blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">[redis学习笔记]主从节点间连接超时判断</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-11-10T15:14:20+08:00">
+                2018-11-10
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/redis学习笔记/" itemprop="url" rel="index">
+                    <span itemprop="name">redis学习笔记</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2018/11/10/[redis学习笔记]主从节点间连接超时判断/" class="leancloud_visitors" data-flag-title="[redis学习笔记]主从节点间连接超时判断">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数&#58;</span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>redis主从节点之间会建立一个连接用于复制数据，该连接由从节点收到slave of命令或者cluster replicate（集群模式下）后发起建立到主节点的连接，主从节点均会定时判断该连接是否超时（这个判断过程在replicationCron函数中实现），如果被判断超时，会断开该连接，从节点需要重新建立连接，继续同步数据。</p>
+<a id="more"></a>
+<h1 id="连接建立"><a href="#连接建立" class="headerlink" title="连接建立"></a>连接建立</h1><p>在非集群模式下，当节点收到slaveof命令时，依次调用slaveofCommand –&gt; replicationSetMaster 函数</p>
+<p>在集群模式下，当节点收到cluster replicate时，会依次调用clusterCommand –&gt; clusterSetMaster –&gt; replicationSetMaster 函数</p>
+<p>在replicationSetMaster函数中会设置server.masterhost和server.masterport，且将server.repl_state设置为REPL_STATE_CONNECT;此后并没有直接连接到主节点的连接，而是在replicationCron周期函数中去执行此过程。</p>
+<p>replicationCron周期函数每秒钟执行一次，发现server.repl_state为REPL_STATE_CONNECT时，会调用connectWithMaster建立到主节点的连接。</p>
+<pre><code>/* Check if we should connect to a MASTER */
+if (server.repl_state == REPL_STATE_CONNECT) {
+    serverLog(LL_NOTICE,&quot;Connecting to MASTER %s:%d&quot;,
+        server.masterhost, server.masterport);
+    if (connectWithMaster() == C_OK) {
+        serverLog(LL_NOTICE,&quot;MASTER &lt;-&gt; SLAVE sync started&quot;);
+    }
+}
+
+int connectWithMaster(void) {
+    int fd;
+
+    fd = anetTcpNonBlockBestEffortBindConnect(NULL,
+        server.masterhost,server.masterport,NET_FIRST_BIND_ADDR);
+    if (fd == -1) {
+        serverLog(LL_WARNING,&quot;Unable to connect to MASTER: %s&quot;,
+            strerror(errno));
+        return C_ERR;
+    }
+
+       if (aeCreateFileEvent(server.el,fd,AE_READABLE|    AE_WRITABLE,syncWithMaster,NULL) ==
+        AE_ERR)
+    {
+        close(fd);
+        serverLog(LL_WARNING,&quot;Can&apos;t create readable event for SYNC&quot;);
+        return C_ERR;
+    }
+
+    server.repl_transfer_lastio = server.unixtime;
+    server.repl_transfer_s = fd;
+    server.repl_state = REPL_STATE_CONNECTING;
+    return C_OK;
+}
+</code></pre><p>从节点建立到主节点的连接后，将socket描述符保存到了server.repl_transfer_s，此后从节点都通过该描述符与主节点交互。此外，在redis中，当节点为从节点时，有一个变量server.master用于保存主节点到从节点的连接客户端，我们会发现server.master客户端中保存的socket描述符就是repl_transfer_s，因此并不是主节点也建立了一个到从节点的连接，只是从节点为主节点封装了一个客户端。</p>
+<p>在全量复制完成后（从节点在readSyncBulkPayload函数中接收并加载完从主节点发送的RDB文件后），会调用replicationCreateMasterClient(server.repl_transfer_s,rsi.repl_stream_db)函数，会创建一个客户端作为主节点到该从节点的客户端，并保存进server.master。客户端的fd即为server.repl_transfer_s。</p>
+<pre><code>void replicationCreateMasterClient(int fd, int dbid) {
+    server.master = createClient(fd);
+    server.master-&gt;flags |= CLIENT_MASTER;
+    server.master-&gt;authenticated = 1;
+    server.master-&gt;reploff = server.master_initial_offset;
+    server.master-&gt;read_reploff = server.master-&gt;reploff;
+    memcpy(server.master-&gt;replid, server.master_replid,
+        sizeof(server.master_replid));
+    /* If master offset is set to -1, this master is old and is not
+     * PSYNC capable, so we flag it accordingly. */
+    if (server.master-&gt;reploff == -1)
+        server.master-&gt;flags |= CLIENT_PRE_PSYNC;
+    if (dbid != -1) selectDb(server.master,dbid);
+}
+</code></pre><p>在部分重同步中亦是如此，在从节点建立到主节点的连接后，注册了一个该fd读写事件回调函数syncWithMaster，在syncWithMaster函数中调用slaveTryPartialResynchronization处理主节点发送过来的全量同步或部分同步消息，在处理部分同步消息时，调用replicationResurrectCachedMaster函数，在该函数中会将从节点到主节点连接的socket描述符保存进server.master中。</p>
+<h1 id="从节点判断主节点超时"><a href="#从节点判断主节点超时" class="headerlink" title="从节点判断主节点超时"></a>从节点判断主节点超时</h1><p>分为不同的阶段，从节点主要判断repl_transfer_lastio和lastinteraction参数，来判断主节点发送数据是否超时。这两个参数均是不同阶段记录上一次主节点发送数据的时间。</p>
+<h2 id="连接建立阶段"><a href="#连接建立阶段" class="headerlink" title="连接建立阶段"></a>连接建立阶段</h2><p>也即在从节点的复制状态（server.repl_state）为REPL_STATE_CONNECTING阶段；</p>
+<p>从节点连接到主节点且向主节点发送ip、replconf、psync等命令，从节点判断repl_transfer_lastio参数，从节点每次从主节点读取到命令回复数据时都会更新该参数，该更新在sendSynchronousCommand函数、connectWithMaster、syncWithMaster等函数中完成。</p>
+<pre><code>if (server.masterhost &amp;&amp;
+    (server.repl_state == REPL_STATE_CONNECTING ||
+     slaveIsInHandshakeState()) &amp;&amp;
+     (time(NULL)-server.repl_transfer_lastio) &gt; server.repl_timeout)
+{
+    serverLog(LL_WARNING,&quot;Timeout connecting to the MASTER...&quot;);
+    cancelReplicationHandshake();
+}
+</code></pre><p>repl_transfer_lastio记录的是主节点上一次发送数据的时间，如果当前距离该时间超过repl_timeout（默认60秒），则认为主节点发送数据超时，则会调用cancelReplicationHandshake函数取消到主节点的连接，并将复制状态repl_state重新设置为REP\L_STATE_CONNECT，等待下一轮调用replicationCron周期函数，重新建立到主节点的连接。</p>
+<h2 id="RDB传输阶段"><a href="#RDB传输阶段" class="headerlink" title="RDB传输阶段"></a>RDB传输阶段</h2><p>在从节点的复制状态（server.repl_state）为REPL_STATE_TRANSFER阶段；</p>
+<p>在等待主节点生成RDB文件和传输RDB文件过程中，从节点依然判断repl_transfer_lastio参数。</p>
+<pre><code>/* Bulk transfer I/O timeout? */
+if (server.masterhost &amp;&amp; server.repl_state == REPL_STATE_TRANSFER &amp;&amp;
+    (time(NULL)-server.repl_transfer_lastio) &gt; server.repl_timeout)
+{
+    serverLog(LL_WARNING,&quot;Timeout receiving bulk data from MASTER... If the problem persists try to set the &apos;repl-timeout&apos; parameter in redis.conf to a larger value.&quot;);
+    cancelReplicationHandshake();
+}
+</code></pre><h3 id="等待主节点生成RDB文件阶段"><a href="#等待主节点生成RDB文件阶段" class="headerlink" title="等待主节点生成RDB文件阶段"></a>等待主节点生成RDB文件阶段</h3><p>在生成RDB过程中，主节点会每秒钟给从节点发送一个换行符（’\n’），从节点在readSyncBulkPayload函数中，接收从主节点发送过来的RDB数据，同时在还没有RDB数据过来时，也能接收到这个换行符，然后更新server.repl_transfer_lastio，接收RDB数据的过程中也会更新该值，于是可以保持主从之间的心跳连接。</p>
+<pre><code>/*
+ * 在从节点等待BGSAVE开始和等待BGSAVE完成时，主节点每秒钟给该从节点发送一个换行符(&quot;\n&quot;)
+ * 从节点会忽略该换行符，但是会更新和主节点最后的交互时间lastinteraction，
+ * 保证了不会发生timeout，也不会影响复制偏移量
+ */
+listRewind(server.slaves,&amp;li);
+while((ln = listNext(&amp;li))) {
+    client *slave = ln-&gt;value;
+
+    int is_presync =
+        (slave-&gt;replstate == SLAVE_STATE_WAIT_BGSAVE_START ||
+        (slave-&gt;replstate == SLAVE_STATE_WAIT_BGSAVE_END &amp;&amp;
+         server.rdb_child_type != RDB_CHILD_TYPE_SOCKET));
+
+    if (is_presync) {
+        if (write(slave-&gt;fd, &quot;\n&quot;, 1) == -1) {
+            /* Don&apos;t worry about socket errors, it&apos;s just a ping. */
+        }
+    }
+}
+</code></pre><p>SLAVE_STATE_WAIT_BGSAVE_START状态表示该从节点在等待BGSAVE完成，即主节点处于生产RDB文件过程。</p>
+<pre><code>/* If repl_transfer_size == -1 we still have to read the bulk length
+ * from the master reply. */
+if (server.repl_transfer_size == -1) {
+    if (syncReadLine(fd,buf,1024,server.repl_syncio_timeout*1000) == -1) {
+        serverLog(LL_WARNING,
+            &quot;I/O error reading bulk count from MASTER: %s&quot;,
+            strerror(errno));
+        goto error;
+    }
+
+    if (buf[0] == &apos;-&apos;) {
+        serverLog(LL_WARNING,
+            &quot;MASTER aborted replication with an error: %s&quot;,
+            buf+1);
+        goto error;
+    } else if (buf[0] == &apos;\0&apos;) {
+        /* At this stage just a newline works as a PING in order to take
+         * the connection live. So we refresh our last interaction
+         * timestamp. */
+        server.repl_transfer_lastio = server.unixtime;
+        return;
+    } else if (buf[0] != &apos;$&apos;) {
+        serverLog(LL_WARNING,&quot;Bad protocol from MASTER, the first byte is not &apos;$&apos; (we received &apos;%s&apos;), are you sure the host and port are right?&quot;, buf);
+        goto error;
+    }
+    ......
+}
+</code></pre><p>repl_transfer_size为-1表示从节点还在等待主节点发送rdb文件的大小，即RDB文件传输还没有开始，此时会收到主节点发送的换行符（’\n’），更新主节点发送数据时间repl_transfer_lastio。</p>
+<h3 id="从节点清空本地数据阶段"><a href="#从节点清空本地数据阶段" class="headerlink" title="从节点清空本地数据阶段"></a>从节点清空本地数据阶段</h3><p>从节点在readSyncBulkPayload函数中接收完RDB文件后，调用emptyDb函数清空本地数据，该过程是一个阻塞过程，所以是不会判断主节点是否超时的。但是从节点在清空数据的过程中，会定期给主节点发送一个换行符（’\n’），用于保持到主节点的心跳。</p>
+<h3 id="从节点加载RDB文件阶段"><a href="#从节点加载RDB文件阶段" class="headerlink" title="从节点加载RDB文件阶段"></a>从节点加载RDB文件阶段</h3><p>在加载RDB文件前，会在rdbLoadRio函数中设置一个回调函数rdbLoadProgressCallback，在加载过程中，会调用该回调函数，在该回调函数中会给主节点发送一个换行符（使得在加载RDB过程中主节点不会认为从节点超时），同时会调用processEventsWhileBlocked函数，加载RDB过程本来是一个阻塞过程，从节点无法响应客户端命令，但是在processEventsWhileBlocked函数中会调用aeProcessEvents(server.el, AE_FILE_EVENTS|AE_DONT_WAIT)；调用事件循环，处理客户端事件，注意到该函数中没有传入AE_TIME_EVENTS，也就是在加载RDB过程中会处理客户端事件，但是不会处理定时任务事件，所以不会进入到replicationCron，也就是说<strong>从节点加载RDB过程中不会判断主节点是否超时</strong>。</p>
+<pre><code>void rdbLoadProgressCallback(rio *r, const void *buf, size_t len) {
+    if (server.rdb_checksum)
+        rioGenericUpdateChecksum(r, buf, len);
+    if (server.loading_process_events_interval_bytes &amp;&amp;
+        (r-&gt;processed_bytes + len)/server.loading_process_events_interval_bytes &gt; r-&gt;processed_bytes/server.loading_process_events_interval_bytes)
+    {
+        /* The DB can take some non trivial amount of time to load. Update
+         * our cached time since it is used to create and update the last
+         * interaction time with clients and for other important things. */
+        updateCachedTime();
+        if (server.masterhost &amp;&amp; server.repl_state == REPL_STATE_TRANSFER)
+            replicationSendNewlineToMaster();
+        loadingProgress(r-&gt;processed_bytes);
+        processEventsWhileBlocked();
+    }
+}
+
+int processEventsWhileBlocked(void) {
+    int iterations = 4; /* See the function top-comment. */
+    int count = 0;
+    while (iterations--) {
+        int events = 0;
+        events += aeProcessEvents(server.el, AE_FILE_EVENTS|AE_DONT_WAIT);
+        events += handleClientsWithPendingWrites();
+        if (!events) break;
+        count += events;
+    }
+    return count;
+}
+</code></pre><p>注意在aeProcessEvents中没有传入AE_TIME_EVENTS选项，因此不会处理定时事件，只会处理客户端事件。因此也可以看出，<strong>在节点加载RDB文件的过程中，并不是完全阻塞的</strong>。</p>
+<h2 id="增量同步阶段"><a href="#增量同步阶段" class="headerlink" title="增量同步阶段"></a>增量同步阶段</h2><p>也即在从节点的复制状态（server.repl_state）为REPL_STATE_CONNECTED阶段；</p>
+<p>从节点在接收并加载完RDB文件后，设置server.repl_state == REPL_STATE_CONNECTED；以后在replicationCron中将判断server.master-&gt;lastinteraction决定与主节点是否超时。<strong>注意<br>lastinteraction是一个client属性。</strong></p>
+<pre><code>if (server.masterhost &amp;&amp; server.repl_state == REPL_STATE_CONNECTED &amp;&amp;
+    (time(NULL)-server.master-&gt;lastinteraction) &gt; server.repl_timeout)
+{
+    serverLog(LL_WARNING,&quot;MASTER timeout: no data nor PING received...&quot;);
+    freeClient(server.master);
+}
+</code></pre><p>如果超时则会释放客户端，在freeClient中，如果被释放的客户端带有CLIENT_MASTER标志位，则会调用replicationHandleMasterDisconnection函数将从节点的复制状态设置为REPL_STATE_CONNECT，于是等待下一轮执行replicationCron周期函数时，重新建立到主节点的连接。</p>
+<p>在整个过程中，主节点每10秒钟会给所有的从节点发送一个ping命令，从节点在接收主节点的增量数据过程中，同时也能收到这个ping命令，于是在读取来自客户端的数据函数中更新该交互时间lastinteraction，在该readQueryFromClient函数中更新。为了保证只有在读取主节点数据时才更新这个时间，在从节点给主节点发送心跳数据时是不更新该数据的，区别于其他的客户端交互时间更新逻辑，见writeToClient函数。</p>
+<p>在replicationCron中主节点每10秒钟给所有从节点发送一个ping命令</p>
+<pre><code>/* First, send PING according to ping_slave_period. */
+// 主节点每10秒钟给所有的从节点发一个PING命令 (repl_ping_slave_period默认值是10)
+if ((replication_cron_loops % server.repl_ping_slave_period) == 0 &amp;&amp;
+    listLength(server.slaves))
+{
+    ping_argv[0] = createStringObject(&quot;PING&quot;,4);
+    replicationFeedSlaves(server.slaves, server.slaveseldb,
+        ping_argv, 1);
+    decrRefCount(ping_argv[0]);
+}
+</code></pre><p>上面的换行符数据不会影响复制偏移量，仅仅保持心跳作用，而在整个过程中发送的ping命令是会影响复制积压缓冲区的，ping命令是通过replicationFeedSlaves函数发送的，会加入复制积压缓冲区。</p>
+<h1 id="主节点判断从节点超时"><a href="#主节点判断从节点超时" class="headerlink" title="主节点判断从节点超时"></a>主节点判断从节点超时</h1><p>主节点通过在replicationCron函数中判断slave-&gt;repl_ack_time参数判断从节点是否超时，repl_ack_time记录每个从节点上一次给主节点发送数据的时间。</p>
+<pre><code>/* Disconnect timedout slaves. */
+if (listLength(server.slaves)) {
+    listIter li;
+    listNode *ln;
+
+    listRewind(server.slaves,&amp;li);
+    while((ln = listNext(&amp;li))) {
+        client *slave = ln-&gt;value;
+
+        if (slave-&gt;replstate != SLAVE_STATE_ONLINE) continue; //RDB文件传输完毕前不检查从节点的连接状态
+        if (slave-&gt;flags &amp; CLIENT_PRE_PSYNC) continue;
+        if ((server.unixtime - slave-&gt;repl_ack_time) &gt; server.repl_timeout)
+        {
+            serverLog(LL_WARNING, &quot;Disconnecting timedout slave: %s&quot;,
+                replicationGetSlaveName(slave));
+            freeClient(slave);
+        }
+    }
+}
+</code></pre><h2 id="连接建立阶段-1"><a href="#连接建立阶段-1" class="headerlink" title="连接建立阶段"></a>连接建立阶段</h2><p>主节点在接收完psync命令以后，才调用listAddNodeTail函数将从节点加入从节点队列中，所以在这个之前不会判断从节点是否超时</p>
+<h2 id="主节点生成和传输RDB阶段"><a href="#主节点生成和传输RDB阶段" class="headerlink" title="主节点生成和传输RDB阶段"></a>主节点生成和传输RDB阶段</h2><p>主节点在传输RDB文件完成后，才会在sendBulkToSlave函数中调用putSlaveOnline函数，设置slave-&gt;replstate = SLAVE_STATE_ONLINE;将状态改为SLAVE_STATE_ONLINE；主节点在replicationCron函数中检查从节点的连接状态时，如果从节点的状态不为SLAVE_STATE_ONLINE则不检查，即在RDB文件生成并传输完毕前，是<strong>不会检查</strong>该从节点的状态。</p>
+<h2 id="从节点加载RDB阶段"><a href="#从节点加载RDB阶段" class="headerlink" title="从节点加载RDB阶段"></a>从节点加载RDB阶段</h2><p>从节点在清空本地数据和加载RDB过程中，会定期给主节点发送一个换行符，保持到主节点的心跳，主节点在processInlineBuffer函数中会解析该换行符并忽略，但是会更新从节点最后发送数据的时间repl_ack_time，保证了从节点在清空本地数据和加载大的RDB文件期间，主节点不会认为从节点断线。</p>
+<p>在processInlineBuffer函数中可以看到如下处理：</p>
+<pre><code>/* Newline from slaves can be used to refresh the last ACK time.
+ * This is useful for a slave to ping back while loading a big
+ * RDB file. */
+if (querylen == 0 &amp;&amp; c-&gt;flags &amp; CLIENT_SLAVE)
+    c-&gt;repl_ack_time = server.unixtime;
+</code></pre><h3 id="从节点清空本地数据期间"><a href="#从节点清空本地数据期间" class="headerlink" title="从节点清空本地数据期间"></a>从节点清空本地数据期间</h3><p>在readSyncBulkPayload函数中，会调用emptyDb，并传入一个回调函数replicationEmptyDbCallback，该回调函数即向主节点写入一个换行符，在遍历数据库清空数据的过程中会定期调用该回调函数，详见_dictClear函数；</p>
+<pre><code>/* Callback used by emptyDb() while flushing away old data to load
+ * the new dataset received by the master. */
+void replicationEmptyDbCallback(void *privdata) {
+    UNUSED(privdata);
+    replicationSendNewlineToMaster();
+}
+
+/*
+ * 在全量同步加载RDB文件的过程中，避免master认为slave超时，slave会给master发送一个换行符(&quot;\n&quot;)
+ * 该函数会在两种情景下调用：
+ * （１）在slave加载RDB文件前，需要先调用emptyDb()清空本地数据，在emptyDb()函数中会调用一个回调函数（即为该函数），
+ * （２）在从节点加载RDB文件的过程中，从节点每次读取RDB文件内容时，会调用校验函数，在校验函数中满足一定条件时会调用该函数给主节点发送一个换行符
+ */
+void replicationSendNewlineToMaster(void) {
+    static time_t newline_sent;
+    if (time(NULL) != newline_sent) {
+        newline_sent = time(NULL);
+        if (write(server.repl_transfer_s,&quot;\n&quot;,1) == -1) {
+            /* Pinging back in this stage is best-effort. */
+        }
+    }
+}
+</code></pre><h3 id="从节点加载RDB文件期间"><a href="#从节点加载RDB文件期间" class="headerlink" title="从节点加载RDB文件期间"></a>从节点加载RDB文件期间</h3><p>在readSyncBulkPayload函数中，清空完本地数据后，接着在调用rdbLoad –&gt; rdbLoadRio加载RDB数据的过程中，会传入一个CRC校验函数，该校验函数中如果节点为从节点，且该从节点的复制状态（server.repl_state）为REPL_STATE_TRANSFER，即还在接收或者加载RDB文件的过程中，则会调用replicationSendNewlineToMaster函数给主节点发送一个换行符。</p>
+<h2 id="增量数据传输阶段"><a href="#增量数据传输阶段" class="headerlink" title="增量数据传输阶段"></a>增量数据传输阶段</h2><p>在正常增量数据传输过程中，在replicationCron函数中，从节点会每秒钟给主节点发送一个replconf ack，带上自己的复制偏移量，主节点在replconfCommand函数中解析ack命令，并更新repl_ack_time时间</p>
+<pre><code>/* Send ACK to master from time to time.
+ * Note that we do not send periodic acks to masters that don&apos;t
+ * support PSYNC and replication offsets. */
+// 从节点每秒钟给主节点发送一个ack，并且带上复制的偏移量
+if (server.masterhost &amp;&amp; server.master &amp;&amp;
+    !(server.master-&gt;flags &amp; CLIENT_PRE_PSYNC))
+    replicationSendAck();
+</code></pre><h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><ul>
+<li>在数据复制阶段，主节点每10秒钟给所有从节点发送一个ping消息，从节点每秒钟给主节点发送一个replconf ack消息，且附带上已从主节点复制的偏移量。</li>
+<li>主节点在生成RDB过程中会每秒钟给从节点发送一个换行符（’\n’）；从节点在清空本地数据和加载RDB过程中，会定期给主节点发送一个换行符（’\n’），保持到主节点的心跳。</li>
+<li>从节点在清空和加载RDB过程中，不检查主节点是否超时；在RDB文件传输完毕前，主节点不检查从节点是否超时。</li>
+<li>从节点在加载RDB文件的过程中，会定期处理客户端事件，但是不会处理定时时间事件。</li>
+</ul>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/redis/" rel="tag"># redis</a>
+          
+            <a href="/tags/主从复制超时/" rel="tag"># 主从复制超时</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/04/09/TreeSet-LinkedHashSet以及HashSet之间的区别/" rel="next" title="TreeSet,LinkedHashSet以及HashSet之间的区别">
+                <i class="fa fa-chevron-left"></i> TreeSet,LinkedHashSet以及HashSet之间的区别
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2018/11/11/[redis学习笔记]redis4.0新特性-非阻塞删除/" rel="prev" title="[redis学习笔记]redis4.0新特性-非阻塞删除">
+                [redis学习笔记]redis4.0新特性-非阻塞删除 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">罗明</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">12</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">3</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">21</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#连接建立"><span class="nav-number">1.</span> <span class="nav-text">连接建立</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#从节点判断主节点超时"><span class="nav-number">2.</span> <span class="nav-text">从节点判断主节点超时</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#连接建立阶段"><span class="nav-number">2.1.</span> <span class="nav-text">连接建立阶段</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#RDB传输阶段"><span class="nav-number">2.2.</span> <span class="nav-text">RDB传输阶段</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#等待主节点生成RDB文件阶段"><span class="nav-number">2.2.1.</span> <span class="nav-text">等待主节点生成RDB文件阶段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#从节点清空本地数据阶段"><span class="nav-number">2.2.2.</span> <span class="nav-text">从节点清空本地数据阶段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#从节点加载RDB文件阶段"><span class="nav-number">2.2.3.</span> <span class="nav-text">从节点加载RDB文件阶段</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#增量同步阶段"><span class="nav-number">2.3.</span> <span class="nav-text">增量同步阶段</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#主节点判断从节点超时"><span class="nav-number">3.</span> <span class="nav-text">主节点判断从节点超时</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#连接建立阶段-1"><span class="nav-number">3.1.</span> <span class="nav-text">连接建立阶段</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#主节点生成和传输RDB阶段"><span class="nav-number">3.2.</span> <span class="nav-text">主节点生成和传输RDB阶段</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#从节点加载RDB阶段"><span class="nav-number">3.3.</span> <span class="nav-text">从节点加载RDB阶段</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#从节点清空本地数据期间"><span class="nav-number">3.3.1.</span> <span class="nav-text">从节点清空本地数据期间</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#从节点加载RDB文件期间"><span class="nav-number">3.3.2.</span> <span class="nav-text">从节点加载RDB文件期间</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#增量数据传输阶段"><span class="nav-number">3.4.</span> <span class="nav-text">增量数据传输阶段</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#总结"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2018</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">罗明</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.4.js"></script>
+  <script>AV.initialize("dsyBwqQYMTnV1RK3gWMNH29r-gzGzoHsz", "41tkvjbnAlNL7Tk0VyIBizQ6");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
