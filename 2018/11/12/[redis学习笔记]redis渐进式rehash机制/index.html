@@ -87,7 +87,7 @@
 <meta property="og:site_name" content="LuoMing&#39;s Blog">
 <meta property="og:description" content="在Redis中，键值对（Key-Value Pair）存储方式是由字典（Dict）保存的，而字典底层是通过哈希表来实现的。通过哈希表中的节点保存字典中的键值对。我们知道当HashMap中由于Hash冲突（负载因子）超过某个阈值时，出于链表性能的考虑，会进行Resize的操作。Redis也一样。 在redis的具体实现中，使用了一种叫做渐进式哈希(rehashing)的机制来提高字典的缩放效率，避免">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2018-11-12T12:08:30.042Z">
+<meta property="og:updated_time" content="2018-11-20T12:43:48.218Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="[redis学习笔记]redis渐进式rehash机制[C">
 <meta name="twitter:description" content="在Redis中，键值对（Key-Value Pair）存储方式是由字典（Dict）保存的，而字典底层是通过哈希表来实现的。通过哈希表中的节点保存字典中的键值对。我们知道当HashMap中由于Hash冲突（负载因子）超过某个阈值时，出于链表性能的考虑，会进行Resize的操作。Redis也一样。 在redis的具体实现中，使用了一种叫做渐进式哈希(rehashing)的机制来提高字典的缩放效率，避免">
@@ -531,7 +531,7 @@ int dictResize(dict *d)
     return dictExpand(d, minimal);
 }
 </code></pre><p>从htNeedsResize函数中可以看到，当哈希表保存的key数量与哈希表的大小的比例小于10%时需要缩容。最小容量为4。</p>
-<p>从dictResize函数中可以看到缩容时，缩容后的哈希表大小为当前哈希表中key的数量，当然经过dictExpand函数中_dictNextPower函数计算后，缩容后的大小为第一个大于等于当前key数量的2的n次方。最小容量为4。</p>
+<p>从dictResize函数中可以看到缩容时，缩容后的哈希表大小为当前哈希表中key的数量，当然经过dictExpand函数中_dictNextPower函数计算后，缩容后的大小为第一个大于等于当前key数量的2的n次方。最小容量为4。同样从dictResize函数中可以看到，如果当前正在执行 BGSAVE 命令或者 BGREWRITEAOF 命令，则不进行缩容（有篇文章中提到缩容时没有考虑bgsave，该说法是错误的）。</p>
 <h1 id="渐进式rehash"><a href="#渐进式rehash" class="headerlink" title="渐进式rehash"></a>渐进式rehash</h1><h2 id="渐进式rehash初始化"><a href="#渐进式rehash初始化" class="headerlink" title="渐进式rehash初始化"></a>渐进式rehash初始化</h2><p>从上面可以看到，不管是扩容还是缩容，最终都是调用dictExpand函数来完成。看看dictExpand函数实现。</p>
 <pre><code>/* Expand or create the hash table */
 int dictExpand(dict *d, unsigned long size)
@@ -596,7 +596,7 @@ int dictExpand(dict *d, unsigned long size)
 static void _dictRehashStep(dict *d) {
     if (d-&gt;iterators == 0) dictRehash(d,1);
 }
-</code></pre><h2 id="定时辅助rehash"><a href="#定时辅助rehash" class="headerlink" title="定时辅助rehash"></a>定时辅助rehash</h2><p>虽然redis实现了在读写操作时，辅助服务器进行渐进式rehash操作，但是如果服务器比较空闲，redis数据库将很长时间内都一直使用两个哈希表。所以在redis周期函数中，如果发现有字典正在进行渐进式rehash操作，则会花费1毫秒的时间，帮助一起进行渐进式rehash操作。</p>
+</code></pre><h2 id="定时辅助rehash"><a href="#定时辅助rehash" class="headerlink" title="定时辅助rehash"></a>定时辅助rehash</h2><p>虽然redis实现了在读写操作时，辅助服务器进行渐进式rehash操作，但是如果服务器比较空闲，redis数据库将很长时间内都一直使用两个哈希表。所以在redis周期函数中，如果发现有字典正在进行渐进式rehash操作，则会花费<strong>1毫秒</strong>的时间，帮助一起进行渐进式rehash操作。</p>
 <p>在databasesCron函数中，实现如下：</p>
 <pre><code>/* Rehash */
     if (server.activerehashing) {
@@ -762,6 +762,10 @@ int dictRehash(dict *d, int n) {
 
           <div class="post-nav-prev post-nav-item">
             
+              <a href="/2018/11/14/[redis学习笔记]redis rehash机制导致数据淘汰分析/" rel="prev" title="[redis学习笔记]redis字典rehash机制导致数据淘汰分析">
+                [redis学习笔记]redis字典rehash机制导致数据淘汰分析 <i class="fa fa-chevron-right"></i>
+              </a>
+            
           </div>
         </div>
       
@@ -837,7 +841,7 @@ int dictRehash(dict *d, int n) {
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">12</span>
+                  <span class="site-state-item-count">18</span>
                   <span class="site-state-item-name">日志</span>
                 </a>
               </div>
@@ -848,7 +852,7 @@ int dictRehash(dict *d, int n) {
               
               <div class="site-state-item site-state-categories">
                 <a href="/categories/index.html">
-                  <span class="site-state-item-count">3</span>
+                  <span class="site-state-item-count">4</span>
                   <span class="site-state-item-name">分类</span>
                 </a>
               </div>
@@ -859,7 +863,7 @@ int dictRehash(dict *d, int n) {
               
               <div class="site-state-item site-state-tags">
                 
-                  <span class="site-state-item-count">21</span>
+                  <span class="site-state-item-count">36</span>
                   <span class="site-state-item-name">标签</span>
                 
               </div>

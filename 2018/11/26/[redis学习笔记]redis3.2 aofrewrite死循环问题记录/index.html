@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="redis,aofrewrite,bug,死循环," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="redis3.2中，当节点正在执行aof文件重写时，如果此时调用config set aofrewrite no命令关闭节点aof持久化，会触发bug导致aof文件重写进入死循环，表现为节点不停的执行aof文件重写，严重影响节点性能和磁盘性能。">
+<meta name="keywords" content="redis,aofrewrite,bug,死循环">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[redis学习笔记]redis3.2 aofrewrite死循环问题记录">
+<meta property="og:url" content="http://yoursite.com/2018/11/26/[redis学习笔记]redis3.2 aofrewrite死循环问题记录/index.html">
+<meta property="og:site_name" content="LuoMing&#39;s Blog">
+<meta property="og:description" content="redis3.2中，当节点正在执行aof文件重写时，如果此时调用config set aofrewrite no命令关闭节点aof持久化，会触发bug导致aof文件重写进入死循环，表现为节点不停的执行aof文件重写，严重影响节点性能和磁盘性能。">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="https://i.imgur.com/JArBs0J.png">
+<meta property="og:image" content="https://i.imgur.com/gHDKlWm.png">
+<meta property="og:image" content="https://i.imgur.com/xTAvriE.png">
+<meta property="og:image" content="https://i.imgur.com/Bd0nPTh.png">
+<meta property="og:updated_time" content="2018-11-26T07:33:37.860Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="[redis学习笔记]redis3.2 aofrewrite死循环问题记录">
+<meta name="twitter:description" content="redis3.2中，当节点正在执行aof文件重写时，如果此时调用config set aofrewrite no命令关闭节点aof持久化，会触发bug导致aof文件重写进入死循环，表现为节点不停的执行aof文件重写，严重影响节点性能和磁盘性能。">
+<meta name="twitter:image" content="https://i.imgur.com/JArBs0J.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2018/11/26/[redis学习笔记]redis3.2 aofrewrite死循环问题记录/"/>
+
+
+
+
+
+  <title>[redis学习笔记]redis3.2 aofrewrite死循环问题记录 | LuoMing's Blog</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">LuoMing's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">小白成长记</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/11/26/[redis学习笔记]redis3.2 aofrewrite死循环问题记录/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="罗明">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="LuoMing's Blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">[redis学习笔记]redis3.2 aofrewrite死循环问题记录</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-11-26T14:22:54+08:00">
+                2018-11-26
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/redis学习笔记/" itemprop="url" rel="index">
+                    <span itemprop="name">redis学习笔记</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2018/11/26/[redis学习笔记]redis3.2 aofrewrite死循环问题记录/" class="leancloud_visitors" data-flag-title="[redis学习笔记]redis3.2 aofrewrite死循环问题记录">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数&#58;</span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>redis3.2中，当节点正在执行aof文件重写时，如果此时调用config set aofrewrite no命令关闭节点aof持久化，会触发bug导致aof文件重写进入死循环，表现为节点不停的执行aof文件重写，严重影响节点性能和磁盘性能。</p>
+<a id="more"></a>
+<h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>线上某机器发生磁盘繁忙告警，运维发现该机器上某节点在aof持久化关闭的状态下，持续不断的执行aofrewrite，严重影响磁盘性能。问题日志如下图所示：</p>
+<p><img src="https://i.imgur.com/JArBs0J.png" alt=""></p>
+<h1 id="aof重写原理"><a href="#aof重写原理" class="headerlink" title="aof重写原理"></a>aof重写原理</h1><h2 id="触发aof重写"><a href="#触发aof重写" class="headerlink" title="触发aof重写"></a>触发aof重写</h2><p>在serverCron函数中，redis会每次在该循环中检查是否满足aofrewrite条件，如果满足条件就会执行aofrewrite。在redis3.2中该部分代码如下所示：</p>
+<pre><code>/* Trigger an AOF rewrite if needed */
+     if (server.rdb_child_pid == -1 &amp;&amp;
+         server.aof_child_pid == -1 &amp;&amp;
+         server.aof_rewrite_perc &amp;&amp;
+         server.aof_current_size &gt; server.aof_rewrite_min_size)
+     {
+        long long base = server.aof_rewrite_base_size ?
+                        server.aof_rewrite_base_size : 1;
+        long long growth = (server.aof_current_size*100/base) - 100;
+        if (growth &gt;= server.aof_rewrite_perc) {
+            serverLog(LL_NOTICE,&quot;Starting automatic rewriting of AOF on %lld%% growth&quot;,growth);
+            rewriteAppendOnlyFileBackground();
+        }
+     }
+</code></pre><p>可以看出需要出发aof文件重写需要同时满足如下几个条件：</p>
+<ul>
+<li>当前没有子进程在执行aof文件重写或者生成RDB文件</li>
+<li>节点设置了aof_rewrite_perc配置，该配置默认值为100，即aof文件大小比上次重写时大一倍则再次进行aof文件重写</li>
+<li>aof文件大小大于64M，主要用于控制触发第一次aof重写</li>
+<li>aof文件比上一次重写时增长了一倍大小或者是满足第一次重写的条件</li>
+</ul>
+<p>此处我们发现，该逻辑有个明显的问题，没有判断是否开启了aof持久化，我们翻看了一下redis4.0代码，发现该逻辑增加了一个判断条件，判断aof是否开启（server.aof_state == AOF_ON），显然虽然该逻辑有点问题，但显然不是这个导致的。</p>
+<h2 id="aof重写完成"><a href="#aof重写完成" class="headerlink" title="aof重写完成"></a>aof重写完成</h2><p>在serverCron函数中，当有子进程在执行aof文件重写时，会检查是否收到子进程完成的通知，如果收到完成信号通知，会调用backgroundRewriteDoneHandler函数进行剩下的一些工作，比如将重写期间的缓冲区内容写入新的aof文件，用新的aof文件替换旧的aof文件等。其主要代码实现如下所示（省略了部分代码）：</p>
+<pre><code>if (server.aof_fd == -1) {
+    /* AOF disabled, we don&apos;t need to set the AOF file descriptor
+     * to this new file, so we can close it. */
+    close(newfd);
+} else {
+    /* AOF enabled, replace the old fd with the new one. */
+    oldfd = server.aof_fd;
+    server.aof_fd = newfd;
+    if (server.aof_fsync == AOF_FSYNC_ALWAYS)
+        aof_fsync(newfd);
+    else if (server.aof_fsync == AOF_FSYNC_EVERYSEC)
+        aof_background_fsync(newfd);
+    server.aof_selected_db = -1; /* Make sure SELECT is re-issued */
+    aofUpdateCurrentSize();
+    server.aof_rewrite_base_size = server.aof_current_size;
+
+    /* Clear regular AOF buffer since its contents was just written to
+     * the new AOF from the background rewrite buffer. */
+    sdsfree(server.aof_buf);
+    server.aof_buf = sdsempty();
+}
+</code></pre><h1 id="问题分析"><a href="#问题分析" class="headerlink" title="问题分析"></a>问题分析</h1><p>该现象非常明显应该是上面的流程中某处有bug导致了不停的执行aof文件重写，所以我们临时改了一下server.aof_rewrite_min_size变量，让节点不要再次进入aofrewrite流程。修改完后，可以看到磁盘繁忙度明显下降，且节点日志也不再进入aofrewrite了。磁盘繁忙监控图表如下所示：</p>
+<p><img src="https://i.imgur.com/gHDKlWm.png" alt=""></p>
+<p>从上面可以看到，如果aof文件重写正常完成的话，在backgroundRewriteDoneHandler函数中会更新server.aof_rewrite_base_size为当前文件的大小。当时看到问题时，有推测应该是某种原因导致该参数更新失败了，在继续追踪前，感觉该问题是一个bug引起的，所以想搜一下是否有其他人遇到该问题。搜索了一下发现确实有人遇到，见参考资料1.</p>
+<p>在搜到的资料中，有人提到当节点正在执行aof文件重写时，如果此时刚好调用config set aofrewrite no命令关闭aof持久化，会导致aofrewrite死循环执行。</p>
+<p>因为在关闭aof持久化时，会调用stopAppendOnly设置server.aof_fd为-1，如果关闭的时候正在进行aofrewrite操作，当子进程结束后，从而导致在backgroundRewriteDoneHandler函数中上面展示的代码中逻辑进入if，永远无法更新server.aof_rewrite_base_size，从而周而复始不停的执行aof文件重写。</p>
+<p>然后我们查看了一下该集群的任务记录，确实该集群之前是开启aof持久化的，并且在不久前关闭了。记录如下所示</p>
+<p><img src="https://i.imgur.com/xTAvriE.png" alt=""></p>
+<p>并且在该服务器上找到该节点一个最后的临时aof文件，且最后一次更新时间与记录中关闭aof持久化操作的时间一致，也就验证了确实正好在节点执行aof文件重写时，关闭了aof持久化策略，触发了该bug。</p>
+<p><img src="https://i.imgur.com/Bd0nPTh.png" alt=""></p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a href="https://github.com/antirez/redis/issues/4545" target="_blank" rel="noopener">https://github.com/antirez/redis/issues/4545</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/redis/" rel="tag"># redis</a>
+          
+            <a href="/tags/aofrewrite/" rel="tag"># aofrewrite</a>
+          
+            <a href="/tags/bug/" rel="tag"># bug</a>
+          
+            <a href="/tags/死循环/" rel="tag"># 死循环</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/11/20/[redis学习笔记]redis4.0新特性-psync2/" rel="next" title="[redis学习笔记]redis新特性--psync2">
+                <i class="fa fa-chevron-left"></i> [redis学习笔记]redis新特性--psync2
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2018/11/26/[redis学习笔记]cluster forget总结及产生的一种异常情况分析/" rel="prev" title="[redis学习笔记]cluster forget总结及产生的一种异常情况分析">
+                [redis学习笔记]cluster forget总结及产生的一种异常情况分析 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">罗明</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">18</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">36</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#背景"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#aof重写原理"><span class="nav-number">2.</span> <span class="nav-text">aof重写原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#触发aof重写"><span class="nav-number">2.1.</span> <span class="nav-text">触发aof重写</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#aof重写完成"><span class="nav-number">2.2.</span> <span class="nav-text">aof重写完成</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#问题分析"><span class="nav-number">3.</span> <span class="nav-text">问题分析</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#参考资料"><span class="nav-number">4.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2018</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">罗明</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.4.js"></script>
+  <script>AV.initialize("dsyBwqQYMTnV1RK3gWMNH29r-gzGzoHsz", "41tkvjbnAlNL7Tk0VyIBizQ6");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

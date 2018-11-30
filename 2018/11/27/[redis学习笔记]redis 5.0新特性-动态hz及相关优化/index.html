@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="redis,dynamic-hz,info,clientsCron," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="redis5.0增加了一个dynamic-hz参数，用于自适应调整server.hz的值，平衡空闲CPU的使用率和响应能力；另外在redis5.0中对info命令、clientsCron函数、大量的短连接情形进行了优化。">
+<meta name="keywords" content="redis,dynamic-hz,info,clientsCron">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[redis学习笔记]redis 5.0新特性--动态hz及相关优化">
+<meta property="og:url" content="http://yoursite.com/2018/11/27/[redis学习笔记]redis 5.0新特性-动态hz及相关优化/index.html">
+<meta property="og:site_name" content="LuoMing&#39;s Blog">
+<meta property="og:description" content="redis5.0增加了一个dynamic-hz参数，用于自适应调整server.hz的值，平衡空闲CPU的使用率和响应能力；另外在redis5.0中对info命令、clientsCron函数、大量的短连接情形进行了优化。">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2018-11-27T10:57:58.623Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="[redis学习笔记]redis 5.0新特性--动态hz及相关优化">
+<meta name="twitter:description" content="redis5.0增加了一个dynamic-hz参数，用于自适应调整server.hz的值，平衡空闲CPU的使用率和响应能力；另外在redis5.0中对info命令、clientsCron函数、大量的短连接情形进行了优化。">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2018/11/27/[redis学习笔记]redis 5.0新特性-动态hz及相关优化/"/>
+
+
+
+
+
+  <title>[redis学习笔记]redis 5.0新特性--动态hz及相关优化 | LuoMing's Blog</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">LuoMing's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">小白成长记</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/11/27/[redis学习笔记]redis 5.0新特性-动态hz及相关优化/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="罗明">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="LuoMing's Blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">[redis学习笔记]redis 5.0新特性--动态hz及相关优化</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-11-27T15:45:37+08:00">
+                2018-11-27
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/redis学习笔记/" itemprop="url" rel="index">
+                    <span itemprop="name">redis学习笔记</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2018/11/27/[redis学习笔记]redis 5.0新特性-动态hz及相关优化/" class="leancloud_visitors" data-flag-title="[redis学习笔记]redis 5.0新特性--动态hz及相关优化">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数&#58;</span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>redis5.0增加了一个dynamic-hz参数，用于自适应调整server.hz的值，平衡空闲CPU的使用率和响应能力；另外在redis5.0中对info命令、clientsCron函数、大量的短连接情形进行了优化。</p>
+<a id="more"></a>
+<h1 id="动态hz参数"><a href="#动态hz参数" class="headerlink" title="动态hz参数"></a>动态hz参数</h1><h2 id="无法解释的延迟"><a href="#无法解释的延迟" class="headerlink" title="无法解释的延迟"></a>无法解释的延迟</h2><p>在redis5.0之前，server.hz参数的值默认为10，即serverCron函数的执行周期为100ms，在serverCron函数中会调用clientsCron函数，处理一些连接客户端相关的事情，比如处理客户端超时、客户端查询缓冲区等。clientsCron函数如下所示：</p>
+<pre><code>#define CLIENTS_CRON_MIN_ITERATIONS 5
+void clientsCron(void) {
+    /* Try to process at least numclients/server.hz of clients
+     * per call. Since normally (if there are no big latency events) this
+     * function is called server.hz times per second, in the average case we
+     * process all the clients in 1 second. */
+    int numclients = listLength(server.clients);
+    int iterations = numclients/server.hz;
+    mstime_t now = mstime();
+
+    /* Process at least a few clients while we are at it, even if we need
+     * to process less than CLIENTS_CRON_MIN_ITERATIONS to meet our contract
+     * of processing each client once per second. */
+    if (iterations &lt; CLIENTS_CRON_MIN_ITERATIONS)
+        iterations = (numclients &lt; CLIENTS_CRON_MIN_ITERATIONS) ?
+                     numclients : CLIENTS_CRON_MIN_ITERATIONS;
+
+    while(listLength(server.clients) &amp;&amp; iterations--) {
+        client *c;
+        listNode *head;
+
+        /* Rotate the list, take the current head, process.
+         * This way if the client must be removed from the list it&apos;s the
+         * first element and we don&apos;t incur into O(N) computation. */
+        listRotate(server.clients);
+        head = listFirst(server.clients);
+        c = listNodeValue(head);
+        /* The following functions do different service checks on the client.
+         * The protocol is that they return non-zero if the client was
+         * terminated. */
+        if (clientsCronHandleTimeout(c,now)) continue;
+        if (clientsCronResizeQueryBuffer(c)) continue;
+        if (clientsCronTrackExpansiveClients(c)) continue;
+    }
+}
+</code></pre><p>在上面的代码中，我们可以看到，为了在每秒钟内处理所有客户端连接一次，每次调用必须处理numclients/server.hz个客户端，因为clientsCron函数每秒钟调用server.hz次。当客户端数量非常多的时候，该部分的耗时将会非常多，比如1W个客户端连接，在默认值10的情况下，每次需要处理1000个客户端。</p>
+<p>而且由于此处属于redis内部逻辑，并且没有延迟监控，当此处逻辑耗时比较大时，我们无法在慢查询日志或者延迟监控中发现，会使得生产上产生一些无法解释的延时现象。</p>
+<h2 id="动态hz实现"><a href="#动态hz实现" class="headerlink" title="动态hz实现"></a>动态hz实现</h2><p>于是在redis5.0中增加了dynamic-hz参数，默认开启动态hz，使得在客户端连接非常多时，自适应调整hz参数，临时增加hz参数，使得每秒钟执行serverCron更多次，占用更多的CPU，每次可以处理一定数量的客户端连接，不至于产生严重超时现象。</p>
+<p>在serverCron函数中，每次检查客户端数量，设置相应的hz值。</p>
+<pre><code>#define CONFIG_MAX_HZ            500
+#define MAX_CLIENTS_PER_CLOCK_TICK 200          /* HZ is adapted based on that. */
+
+server.hz = server.config_hz;   //默认值为10
+/* Adapt the server.hz value to the number of configured clients. If we have
+ * many clients, we want to call serverCron() with an higher frequency. */
+if (server.dynamic_hz) {
+    while (listLength(server.clients) / server.hz &gt;
+           MAX_CLIENTS_PER_CLOCK_TICK)
+    {
+        server.hz *= 2;
+        if (server.hz &gt; CONFIG_MAX_HZ) {
+            server.hz = CONFIG_MAX_HZ;
+            break;
+        }
+    }
+}
+</code></pre><p>可以看出，每次循环最多处理200个客户端连接，hz的值最高不超过500（事实上，自己设置的话不建议超过100），默认hz值10将作为一个基线，每次循环都将hz设为配置的hz值，然后，如果客户端数量非常多，就自适应调整hz的值；下一次循环中，如果客户端数量变少了，hz值依然会是默认值了。</p>
+<h1 id="clientsCron优化"><a href="#clientsCron优化" class="headerlink" title="clientsCron优化"></a>clientsCron优化</h1><h2 id="4-0中实现"><a href="#4-0中实现" class="headerlink" title="4.0中实现"></a>4.0中实现</h2><p>上面说了，在clientsCron中一次处理过多客户端连接，可能会引起延时，在redis5.0以前版本中，clientsCron函数中调用的clientsCronResizeQueryBuffer函数存在一个bug，使得该问题得到加剧和放大。</p>
+<p>redis5.0以前的clientsCronResizeQueryBuffer函数实现为：</p>
+<pre><code>int clientsCronResizeQueryBuffer(client *c) {
+    size_t querybuf_size = sdsAllocSize(c-&gt;querybuf);
+    time_t idletime = server.unixtime - c-&gt;lastinteraction;
+
+    /* There are two conditions to resize the query buffer:
+     * 1) Query buffer is &gt; BIG_ARG and too big for latest peak.
+     * 2) Client is inactive and the buffer is bigger than 1k. */
+    if (((querybuf_size &gt; PROTO_MBULK_BIG_ARG) &amp;&amp;
+         (querybuf_size/(c-&gt;querybuf_peak+1)) &gt; 2) ||
+         (querybuf_size &gt; 1024 &amp;&amp; idletime &gt; 2))
+    {
+        /* Only resize the query buffer if it is actually wasting space. */
+        if (sdsavail(c-&gt;querybuf) &gt; 1024) {
+            c-&gt;querybuf = sdsRemoveFreeSpace(c-&gt;querybuf);
+        }
+    }
+    /* Reset the peak again to capture the peak memory usage in the next
+     * cycle. */
+    c-&gt;querybuf_peak = 0;
+    return 0;
+}
+</code></pre><p>满足以下两个条件之一时：</p>
+<p>（1） 查询缓冲区大于32K，且远大于查询缓冲区数据峰值</p>
+<p>（2） 查询缓冲区大于1K，且客户端当前处于非活跃状态</p>
+<p>同时查询缓冲区空闲空间大于1K，就回收空闲空间。</p>
+<p>而输入缓冲区在第一次分配时就为32K，所以显然大于1K，所以只要不够活跃很容易满足回收条件</p>
+<p>输入缓冲区空间分配在readQueryFromClient函数中，</p>
+<pre><code>#define PROTO_IOBUF_LEN         (1024*16)  /* Generic I/O buffer size */
+
+readlen = PROTO_IOBUF_LEN;
+
+c-&gt;querybuf = sdsMakeRoomFor(c-&gt;querybuf, readlen);
+</code></pre><p>在sdsMakeRoomFor函数中分配时，如果分配的空间小于1M，会乘以2，所以首次就分配了32K空间。</p>
+<h2 id="5-0中实现"><a href="#5-0中实现" class="headerlink" title="5.0中实现"></a>5.0中实现</h2><p>在redis5.0中clientsCronResizeQueryBuffer函数实现如下：</p>
+<pre><code>int clientsCronResizeQueryBuffer(client *c) {
+    size_t querybuf_size = sdsAllocSize(c-&gt;querybuf);
+    time_t idletime = server.unixtime - c-&gt;lastinteraction;
+
+    /* There are two conditions to resize the query buffer:
+     * 1) Query buffer is &gt; BIG_ARG and too big for latest peak.
+     * 2) Query buffer is &gt; BIG_ARG and client is idle. */
+    if (querybuf_size &gt; PROTO_MBULK_BIG_ARG &amp;&amp;
+         ((querybuf_size/(c-&gt;querybuf_peak+1)) &gt; 2 ||
+          idletime &gt; 2))
+    {
+        /* Only resize the query buffer if it is actually wasting
+         * at least a few kbytes. */
+        if (sdsavail(c-&gt;querybuf) &gt; 1024*4) {
+            c-&gt;querybuf = sdsRemoveFreeSpace(c-&gt;querybuf);
+        }
+    }
+    /* Reset the peak again to capture the peak memory usage in the next
+     * cycle. */
+    c-&gt;querybuf_peak = 0;
+    //...
+}
+</code></pre><p>更改为满足以下两个条件之一：</p>
+<p>（1） 查询缓冲区大于32K，且远大于查询缓冲区数据峰值</p>
+<p>（2） 查询缓冲区大于32K，且客户端当前处于非活跃状态</p>
+<p>同时查询缓冲区空闲空间大于4K，就回收空闲空间。</p>
+<p>如果客户端数量比较多，且刚好比较空闲，在5.0以前，很容易因为需要一次处理很多客户端的输入缓冲区，导致节点延迟甚至崩溃。</p>
+<h2 id="案例分享"><a href="#案例分享" class="headerlink" title="案例分享"></a>案例分享</h2><p>下面链接两个相关案例：</p>
+<ul>
+<li><a href="http://www.cnblogs.com/CtripDBA/p/9776466.html?utm_source=tuicool&amp;utm_medium=referral" target="_blank" rel="noopener">记一个真实的排障案例：携程Redis偶发连接失败案例分析</a></li>
+<li><a href="https://github.com/antirez/redis/issues/4983" target="_blank" rel="noopener">seconds hang up report </a></li>
+</ul>
+<h1 id="info命令优化"><a href="#info命令优化" class="headerlink" title="info命令优化"></a>info命令优化</h1><h2 id="info命令慢日志"><a href="#info命令慢日志" class="headerlink" title="info命令慢日志"></a>info命令慢日志</h2><p>按说info命令只是返回一些基本统计数据，不应该有慢日志，但是在redis5.0以前，当客户端连接非常大的时候，可能会出现info慢日志。</p>
+<p>原因是，在redis5.0以前的info命令实现中，每次会获取所有客户端中使用的最大输入/输出缓冲区大小，因此需要循环遍历每个客户端连接，当客户端数据非常大，比如上万连接时，将操作将会非常耗时。</p>
+<p>info命令实现依次调用genRedisInfoString –&gt; getClientsMaxBuffers，代码就不列出了，可以自行查看源码，并且是在genRedisInfoString函数中一开始就调用，所以对所有info子命令都有影响。</p>
+<h2 id="info命令优化-1"><a href="#info命令优化-1" class="headerlink" title="info命令优化"></a>info命令优化</h2><p>在redis5.0中，对该问题进行了优化，不再每次获取所有客户端连接的最大输入/输出缓冲区大小，而是在clientsCron函数中用一个数组记录客户端连接最近几秒时间的输入/输出缓冲区最大值，在info clients子命令中调用getExpansiveClientsInfo函数，获取这个数组中保存的最近几秒时间内的最大值，这样不管客户端连接数量多达，获取时间都是恒定的，且耗时非常小。</p>
+<p>在clientsCron函数中调用clientsCronTrackExpansiveClients追踪所有客户端连接中最近几秒的输入/输出缓冲区最大值</p>
+<pre><code>int clientsCronTrackExpansiveClients(client *c) {
+    size_t in_usage = sdsAllocSize(c-&gt;querybuf);
+    size_t out_usage = getClientOutputBufferMemoryUsage(c);
+    int i = server.unixtime % CLIENTS_PEAK_MEM_USAGE_SLOTS;
+    int zeroidx = (i+1) % CLIENTS_PEAK_MEM_USAGE_SLOTS;
+
+    /* Always zero the next sample, so that when we switch to that second, we&apos;ll
+     * only register samples that are greater in that second without considering
+     * the history of such slot.
+     *
+     * Note: our index may jump to any random position if serverCron() is not
+     * called for some reason with the normal frequency, for instance because
+     * some slow command is called taking multiple seconds to execute. In that
+     * case our array may end containing data which is potentially older
+     * than CLIENTS_PEAK_MEM_USAGE_SLOTS seconds: however this is not a problem
+     * since here we want just to track if &quot;recently&quot; there were very expansive
+     * clients from the POV of memory usage. */
+    ClientsPeakMemInput[zeroidx] = 0;
+    ClientsPeakMemOutput[zeroidx] = 0;
+
+    /* Track the biggest values observed so far in this slot. */
+    if (in_usage &gt; ClientsPeakMemInput[i]) ClientsPeakMemInput[i] = in_usage;
+    if (out_usage &gt; ClientsPeakMemOutput[i]) ClientsPeakMemOutput[i] = out_usage;
+
+    return 0; /* This function never terminates the client. */
+}
+</code></pre><p>在info命令的实现中依次调用genRedisInfoString –&gt; getExpansiveClientsInfo</p>
+<pre><code>/* Return the max samples in the memory usage of clients tracked by
+ * the function clientsCronTrackExpansiveClients(). */
+void getExpansiveClientsInfo(size_t *in_usage, size_t *out_usage) {
+    size_t i = 0, o = 0;
+    for (int j = 0; j &lt; CLIENTS_PEAK_MEM_USAGE_SLOTS; j++) {
+        if (ClientsPeakMemInput[j] &gt; i) i = ClientsPeakMemInput[j];
+        if (ClientsPeakMemOutput[j] &gt; o) o = ClientsPeakMemOutput[j];
+    }
+    *in_usage = i;
+    *out_usage = o;
+}
+</code></pre><h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://github.com/antirez/redis/pull/4727" target="_blank" rel="noopener">move getClientsMaxBuffers func into info clients command</a></li>
+<li><a href="https://github.com/antirez/redis/issues/5145" target="_blank" rel="noopener">Make INFO faster again!11one</a></li>
+</ul>
+<h1 id="短连接优化"><a href="#短连接优化" class="headerlink" title="短连接优化"></a>短连接优化</h1><h2 id="5-0以前实现"><a href="#5-0以前实现" class="headerlink" title="5.0以前实现"></a>5.0以前实现</h2><p>Redis在释放客户端连接的时候，会依次调用freeClient –&gt; unlinkClient –&gt; listSearchKey,可以看到在listSearchKey中，redis遍历双端列表server.clients查找到对应的redisClient对象然后调用listDelNode把该redisClient对象从server.clients删除,</p>
+<pre><code>if (c-&gt;fd != -1) {
+    /* Remove from the list of active clients. */
+    ln = listSearchKey(server.clients,c);
+    serverAssert(ln != NULL);
+    listDelNode(server.clients,ln);
+
+    /* Unregister async I/O handlers and close the socket. */
+    aeDeleteFileEvent(server.el,c-&gt;fd,AE_READABLE);
+    aeDeleteFileEvent(server.el,c-&gt;fd,AE_WRITABLE);
+    close(c-&gt;fd);
+    c-&gt;fd = -1;
+}
+</code></pre><p>listSearchKey遍历列表为O(n)时间复杂度，当大量短连接操作redis时，频繁的释放客户端会引起redis的CPU使用率显著上升。</p>
+<h2 id="5-0优化"><a href="#5-0优化" class="headerlink" title="5.0优化"></a>5.0优化</h2><p>在redis5.0中为了解决此问题，对此操作进行了优化。在createClient的时候将redisClient的指针地址保留，在freeClient的时候直接删除对应的listNode即可，无需再次遍历server.clients。</p>
+<p><strong>在createClient函数中</strong>，最后会调用linkClient函数</p>
+<pre><code>if (fd != -1) linkClient(c);
+
+//linkClient实现如下：
+/* This function links the client to the global linked list of clients.
+ * unlinkClient() does the opposite, among other things. */
+void linkClient(client *c) {
+    listAddNodeTail(server.clients,c);
+    /* Note that we remember the linked list node where the client is stored,
+     * this way removing the client in unlinkClient() will not require
+     * a linear scan, but just a constant time operation. */
+    c-&gt;client_list_node = listLast(server.clients);
+    uint64_t id = htonu64(c-&gt;id);
+    raxInsert(server.clients_index,(unsigned char*)&amp;id,sizeof(id),c,NULL);
+}
+</code></pre><p>可以看到，在将新建的client插入server.clients列表时，将封装该client的节点指针保存进了c-&gt;client_list_node；同时以client的唯一索引作为索引，将client插入基数树中。</p>
+<p><strong>在释放客户端时</strong>，仍然是依次调用freeClient –&gt; unlinkClient，在unlinkClient中此时只需要根据保存的节点指针直接去列表中把节点删除，无需遍历列表，时间复杂度直接降为O(1)。</p>
+<pre><code>if (c-&gt;fd != -1) {
+    /* Remove from the list of active clients. */
+    if (c-&gt;client_list_node) {
+        uint64_t id = htonu64(c-&gt;id);
+        raxRemove(server.clients_index,(unsigned char*)&amp;id,sizeof(id),NULL);
+        listDelNode(server.clients,c-&gt;client_list_node);
+        c-&gt;client_list_node = NULL;
+    }
+
+    /* Unregister async I/O handlers and close the socket. */
+    aeDeleteFileEvent(server.el,c-&gt;fd,AE_READABLE);
+    aeDeleteFileEvent(server.el,c-&gt;fd,AE_WRITABLE);
+    close(c-&gt;fd);
+    c-&gt;fd = -1;
+}
+</code></pre><p>该函数中根据client唯一id，将客户端从基数树中删除，根据节点指针将客户端直接从server.clients列表中删除。</p>
+<p>基数树用于client unblock命令操作。</p>
+<h2 id="参考资料-1"><a href="#参考资料-1" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://www.cnblogs.com/tinywan/p/6080293.html" target="_blank" rel="noopener">Redis高级实践之————Redis短连接性能优化</a></li>
+</ul>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/redis/" rel="tag"># redis</a>
+          
+            <a href="/tags/dynamic-hz/" rel="tag"># dynamic-hz</a>
+          
+            <a href="/tags/info/" rel="tag"># info</a>
+          
+            <a href="/tags/clientsCron/" rel="tag"># clientsCron</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/11/26/[redis学习笔记]cluster forget总结及产生的一种异常情况分析/" rel="next" title="[redis学习笔记]cluster forget总结及产生的一种异常情况分析">
+                <i class="fa fa-chevron-left"></i> [redis学习笔记]cluster forget总结及产生的一种异常情况分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2018/11/30/[Unix编程]fread fwrite fflush实现/" rel="prev" title="[Unix编程]fread/fwrite/fflush实现">
+                [Unix编程]fread/fwrite/fflush实现 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">罗明</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">18</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">36</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#动态hz参数"><span class="nav-number">1.</span> <span class="nav-text">动态hz参数</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#无法解释的延迟"><span class="nav-number">1.1.</span> <span class="nav-text">无法解释的延迟</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#动态hz实现"><span class="nav-number">1.2.</span> <span class="nav-text">动态hz实现</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#clientsCron优化"><span class="nav-number">2.</span> <span class="nav-text">clientsCron优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-0中实现"><span class="nav-number">2.1.</span> <span class="nav-text">4.0中实现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-0中实现"><span class="nav-number">2.2.</span> <span class="nav-text">5.0中实现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#案例分享"><span class="nav-number">2.3.</span> <span class="nav-text">案例分享</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#info命令优化"><span class="nav-number">3.</span> <span class="nav-text">info命令优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#info命令慢日志"><span class="nav-number">3.1.</span> <span class="nav-text">info命令慢日志</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#info命令优化-1"><span class="nav-number">3.2.</span> <span class="nav-text">info命令优化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考资料"><span class="nav-number">3.3.</span> <span class="nav-text">参考资料</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#短连接优化"><span class="nav-number">4.</span> <span class="nav-text">短连接优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-0以前实现"><span class="nav-number">4.1.</span> <span class="nav-text">5.0以前实现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-0优化"><span class="nav-number">4.2.</span> <span class="nav-text">5.0优化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考资料-1"><span class="nav-number">4.3.</span> <span class="nav-text">参考资料</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2018</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">罗明</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.4.js"></script>
+  <script>AV.initialize("dsyBwqQYMTnV1RK3gWMNH29r-gzGzoHsz", "41tkvjbnAlNL7Tk0VyIBizQ6");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
