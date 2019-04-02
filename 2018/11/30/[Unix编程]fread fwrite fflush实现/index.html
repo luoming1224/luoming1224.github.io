@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="fread,fwrite,fflush,fsync," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="由于redis中涉及到fread、fwrite、fflush、fsync这四个命令的使用，所以做一个总结笔记，方便查阅。">
+<meta name="keywords" content="fread,fwrite,fflush,fsync">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[Unix编程]fread&#x2F;fwrite&#x2F;fflush实现">
+<meta property="og:url" content="http://yoursite.com/2018/11/30/[Unix编程]fread fwrite fflush实现/index.html">
+<meta property="og:site_name" content="LuoMing&#39;s Blog">
+<meta property="og:description" content="由于redis中涉及到fread、fwrite、fflush、fsync这四个命令的使用，所以做一个总结笔记，方便查阅。">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="https://i.imgur.com/Kfisi03.png">
+<meta property="og:updated_time" content="2018-11-30T10:44:54.115Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="[Unix编程]fread&#x2F;fwrite&#x2F;fflush实现">
+<meta name="twitter:description" content="由于redis中涉及到fread、fwrite、fflush、fsync这四个命令的使用，所以做一个总结笔记，方便查阅。">
+<meta name="twitter:image" content="https://i.imgur.com/Kfisi03.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2018/11/30/[Unix编程]fread fwrite fflush实现/"/>
+
+
+
+
+
+  <title>[Unix编程]fread/fwrite/fflush实现 | LuoMing's Blog</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">LuoMing's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">小白成长记</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/11/30/[Unix编程]fread fwrite fflush实现/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="罗明">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="LuoMing's Blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">[Unix编程]fread/fwrite/fflush实现</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-11-30T14:55:30+08:00">
+                2018-11-30
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Unix编程/" itemprop="url" rel="index">
+                    <span itemprop="name">Unix编程</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2018/11/30/[Unix编程]fread fwrite fflush实现/" class="leancloud_visitors" data-flag-title="[Unix编程]fread/fwrite/fflush实现">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数&#58;</span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>由于redis中涉及到fread、fwrite、fflush、fsync这四个命令的使用，所以做一个总结笔记，方便查阅。</p>
+<a id="more"></a>
+<h1 id="fread-read-fwrite-write实现与区别"><a href="#fread-read-fwrite-write实现与区别" class="headerlink" title="fread/read fwrite/write实现与区别"></a>fread/read fwrite/write实现与区别</h1><p>fread就是通过read来实现的，fread是C语言的库，而read是系统调用。</p>
+<p>差别在read每次读的数据是调用者要求的大小，比如调用者要求读取10个字节数据，read就会从内核缓冲区（操作系统开辟的一段空间用来存储磁盘上的数据）读10个字节数据到数组中，所以每次调用read会涉及到用户态与內核态之间的切换从而损耗一定的性能。而fread不一样，为了加快读的速度，fread每次都会从内核缓冲区读比要求更多的数据，然后放到应用进程缓冲区(首地址存在FILE结构体中)，这样下次再读数据只需要到应用进程缓冲区中去取而无需过多的系统调用。</p>
+<p>fwrite也是通过write来实现的，fwrite是C语言的库，而write是系统调用。</p>
+<p>差别在write每次写的数据是调用者要求的大小，比如调用者要求写入10个字节数据，write就会写10个字节数据到内核缓冲区中，所以依然涉及到用户态与內核态之间的切换，操作系统会定期地把这些存在内核缓冲区的数据写回磁盘中。而fwrite不一样，fwrite每次都会先把数据写入一个应用进程缓冲区，等到该缓冲区满了，或者调用类似调用fflush这种冲洗缓冲区的函数时，系统会调用write一次性把相应数据写进内核缓冲区中。同样减少了系统调用(即write调用)。</p>
+<p>所以我们应该知道，实际上write和read不会直接从磁盘文件中读写数据。例如read是从磁盘所关联的一个内核缓冲区读写数据。(因为磁盘读取数据速度实在太慢了，所以操作系统往往采用预读技术读取磁盘数据)。write也是仅将数据写进内核缓冲区，操作系统通过运行一个守护进程，定期的将内核缓冲区写入磁盘。</p>
+<h1 id="fflush、fsync实现与区别"><a href="#fflush、fsync实现与区别" class="headerlink" title="fflush、fsync实现与区别"></a>fflush、fsync实现与区别</h1><h2 id="延迟写"><a href="#延迟写" class="headerlink" title="延迟写"></a>延迟写</h2><p>延迟写（delayed write）: 传统的UNIX实现在内核中设有缓冲区高速缓存或页面高速缓存，大多数磁盘I/O都通过缓冲进行。 当将数据写入文件时，内核通常先将该数据复制到其中一个缓冲区中，如果该缓冲区尚未写满，则 并不将其排入输出队列，而是等待其写满或者当内核需要重用该缓冲区以便存放其他磁盘块数据时， 再将该缓冲排入到输出队列，然后待其到达队首时，才进行实际的I/O操作。这种输出方式就被称为延迟写。</p>
+<p>延迟写减少了磁盘读写次数，但是却降低了文件内容的更新速度，使得欲写到文件中的数据在一段时间内并没有写到磁盘上。当系统发生故障时，这种延迟可能造成文件更新内容的丢失。为了保证磁盘上实际文件系统与缓冲区高速缓存中内容的一致性，UNIX系统提供了sync、fsync和fdatasync三个函数。</p>
+<h2 id="sync函数"><a href="#sync函数" class="headerlink" title="sync函数"></a>sync函数</h2><p>sync函数只是将所有修改过的块缓冲区排入写队列，然后就返回，它并不等待实际写磁盘操作结束。</p>
+<p>通常称为update的系统守护进程会周期性地（一般每隔30秒）调用sync函数。这就保证了定期冲洗内核的块缓冲区。命令sync(1)也调用sync函数。</p>
+<h2 id="fsync函数"><a href="#fsync函数" class="headerlink" title="fsync函数"></a>fsync函数</h2><p>fsync将内核缓冲区中的内容真正写入磁盘，fsync函数只对由文件描述符filedes指定的单一文件起作用，并且等待写磁盘操作结束，然后返回。并且fsync除了写入数据外，还会将文件的元信息同步更新到文件。</p>
+<p>fsync可用于数据库这样的应用程序，这种应用程序需要确保将修改过的块立即写到磁盘上。</p>
+<h2 id="fdatasync函数"><a href="#fdatasync函数" class="headerlink" title="fdatasync函数"></a>fdatasync函数</h2><p>fdatasync函数类似于fsync，但它只影响文件的数据部分。而除数据外，fsync还会同步更新文件的属性。</p>
+<p>对于提供事务支持的数据库，在事务提交时，都要确保事务日志（包含该事务所有的修改操作以及一个提交记录）完全写到硬盘上，才认定事务提交成功并返回给应用层。</p>
+<h2 id="fflush"><a href="#fflush" class="headerlink" title="fflush"></a>fflush</h2><p>标准IO函数（如fread，fwrite等）会在内存中建立缓冲，<strong>该函数刷新内存缓冲，将内容写入内核缓冲</strong>，要想将其真正写入磁盘，还需要调用fsync。（即先调用fflush然后再调用fsync，否则不会起作用）。fflush以指定的文件流描述符为参数（对应以fopen等函数打开的文件流），仅仅是把上层缓冲区中的数据刷新到内核缓冲区就返回，</p>
+<p>因此相对于fsync而言不是很安全，还需要再调用一下fsync来把数据真正写入硬盘。使用函数</p>
+<blockquote>
+<p>int fileno(FILE *stream);</p>
+</blockquote>
+<p>把文件流描述符（fp）转换为文件描述符（fd），以方便fsync的调用，那么，在Linux操作系统上，怎样才能保证数据被正确地写入外部永久存储介质？</p>
+<ul>
+<li>write不能满足要求，需要fsync</li>
+</ul>
+<p>对于write函数，我们认为该函数一旦返回，数据便已经写到了文件中。但是这种概念只是宏观上的，一般情况下，对硬盘（或者其他持久存储设备）文件的write操作，更新的只是内核缓冲区，而内核缓冲区中数据不会立即更新到硬盘中，而是由操作系统统一调度，如flusher内核线程在满足一定条件时（一定时间间隔、内存中的脏页达到一定比例）将内核缓冲区中数据同步到硬盘上（放入设备的IO请求队列）。因为write调用不会等到硬盘IO完成之后才返回，设想如果操作系统在write调用之后、硬盘同步之前崩溃，则数据可能丢失。虽然这样的时间窗口很小，但是对于需要保证事务的持久化（durability）和一致性（consistency）的数据库程序来说，write()所提供的“松散的异步语义”是不够的，通常需要操作系统提供的同步IO（synchronized-IO）原语来保证：</p>
+<p>函数原型：</p>
+<blockquote>
+<p>int fsync(int fd); </p>
+</blockquote>
+<p>fsync的功能是确保文件fd所有已修改的内容已经正确同步到硬盘上，该调用会阻塞等待直到设备报告IO完成。</p>
+<ul>
+<li>fsync与fdatasync区别</li>
+</ul>
+<p>除了同步文件的修改内容（脏页），fsync还会同步文件的描述信息（metadata，包括size、访问时间等等），因为文件的数据和metadata通常存在硬盘的不同地方，因此fsync至少需要两次IO写操作，多余的一次IO操作，根据Wikipedia的数据，当前硬盘驱动的平均寻道时间（Average seek time）大约是3~15ms，7200RPM硬盘的平均旋转延迟（Average rotational latency）大约为4ms，因此一次IO操作的耗时大约为10ms左右。Posix同样定义了fdatasync，放宽了同步的语义以提高性能：</p>
+<blockquote>
+<p>int fdatasync(int fd);</p>
+</blockquote>
+<p>fdatasync的功能与fsync类似，但是仅仅在必要的情况下才会同步，因此可以减少一次IO写操作。</p>
+<h1 id="内核缓冲区、应用缓冲区"><a href="#内核缓冲区、应用缓冲区" class="headerlink" title="内核缓冲区、应用缓冲区"></a>内核缓冲区、应用缓冲区</h1><p>应用缓冲技术能很明显的提高系统效率。内核与外围设备的数据交换，内核与用户空间的数据交换都是比较费时的，使用缓冲区就是为了优化这些费时的操作。其实核心到用户空间的操作本身是不buffer的，是由I/O库用buffer来优化了这个操作。比如read本来从内核读取数据时是比较费时的，所以一次取出一块，以避免多次陷入内核。</p>
+<p>应用内核缓冲区的 主要思想就是一次读入大量的数据放在缓冲区，需要的时候从缓冲区取得数据。</p>
+<p>管理员模式和用户模式之间的切换需要消耗时间，但相比之下，磁盘的I/O操作消耗的时间更多，为了提高效率，内核也使用缓冲区技术来提高对磁盘的访问速度。磁盘是数据块 的集合，内核会对磁盘上的数据块做缓冲。内核将磁盘上的数据块复制到内核缓冲区中，当一个用户空间中的进程要从磁盘上读数据时，内核一般不直接读磁盘，而 是将内核缓冲区中的数据复制到进程的缓冲区中。当进程所要求的数据块不在内核缓冲区时，内核会把相应的数据块加入到请求队列，然后把该进程挂起，接着为其 他进程服务。一段时间之后(其实很短的时间)，内核把相应的数据块从磁盘读到内核缓冲区，然后再把数据复制到进程的缓冲区中，最后唤醒被挂起的进程。</p>
+<p>注：理解内核缓冲区技术的原理有助于更好的掌握系统调用read&amp;write，read把数据从内核缓冲区复制到进程缓冲区，write把数据从进程缓冲区复制到内核缓冲区，它们不等价于数据在内核缓冲区和磁盘之间的交换。</p>
+<p>从理论上讲，内核可以在任何时候写磁盘，但并不是所有的write操作都会导致内核的写动作。内核会把要写的数据暂时存在缓冲区中，积累到一定数量后再一 次写入。有时会导致意外情况，比如断电，内核还来不及把内核缓冲区中的数据写道磁盘上，这些更新的数据就会丢失。</p>
+<p>应用内核缓冲技术导致的结果是：提高了磁盘的I/O效率；优化了磁盘的写操作；需要及时的将缓冲数据写到磁盘。</p>
+<p>同时我们也加深了对read/write是阻塞命令的理解，在网络I/O操作中，我们也说到read是从内核缓冲区中读入数据到应用缓冲区中，而且如果数据还没有收到，内核缓冲区为空，则read会一直阻塞等待，直到数据到达内核缓冲区。</p>
+<p>#总结</p>
+<ul>
+<li>fread从应用进程的应用缓冲区中读取数据</li>
+<li>fwrite将数据写入应用进程的应用缓冲区</li>
+<li>read从内核缓冲区中读入数据到应用缓冲区</li>
+<li>write将数据从应用缓冲区写入内核缓冲区</li>
+<li>fflush将数据从应用缓冲区冲刷到内核缓冲区</li>
+<li>fsync将内核缓冲区中的数据真正同步到磁盘文件</li>
+</ul>
+<p>所以可以看出fflush和fsync的调用顺序应该是：<br>fwrite —–&gt; c库缓冲—–&gt; fflush———〉内核缓冲——–fsync—–〉磁盘</p>
+<p>read/write/fsync： </p>
+<ol>
+<li><p>linux底层操作；</p>
+</li>
+<li><p>内核调用， 涉及到进程上下文的切换，即用户态到核心态的转换，这是个比较消耗性能的操作。</p>
+</li>
+</ol>
+<p>fread/fwrite/fflush： </p>
+<ol>
+<li><p>c语言标准规定的io流操作，建立在read/write/fsync之上</p>
+</li>
+<li><p>在用户层， 又增加了一层缓冲机制，用于减少内核调用次数，但是增加了一次内存拷贝。</p>
+</li>
+</ol>
+<p>两者之间的关系，见下图：<br><img src="https://i.imgur.com/Kfisi03.png" alt=""></p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><ul>
+<li><a href="https://www.jb51.net/article/101062.htm" target="_blank" rel="noopener">函数sync、fsync与fdatasync的总结整理(必看篇)</a></li>
+<li><a href="https://blog.csdn.net/xiaofei0859/article/details/74686254" target="_blank" rel="noopener">read/fread write/fwrite 的实现原理</a></li>
+<li><a href="https://blog.csdn.net/yy660560/article/details/69525721" target="_blank" rel="noopener">关于内核缓冲区，和应用程序缓冲区</a></li>
+<li><a href="https://blog.csdn.net/abcd1f2/article/details/53436244" target="_blank" rel="noopener">fflush和fsync的一些总结</a></li>
+<li><a href="https://blog.csdn.net/ybxuwei/article/details/22727565" target="_blank" rel="noopener">read/write/fsync与fread/fwrite/fflush的关系和区别</a></li>
+</ul>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/fread/" rel="tag"># fread</a>
+          
+            <a href="/tags/fwrite/" rel="tag"># fwrite</a>
+          
+            <a href="/tags/fflush/" rel="tag"># fflush</a>
+          
+            <a href="/tags/fsync/" rel="tag"># fsync</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/11/27/[redis学习笔记]redis 5.0新特性-动态hz及相关优化/" rel="next" title="[redis学习笔记]redis 5.0新特性--动态hz及相关优化">
+                <i class="fa fa-chevron-left"></i> [redis学习笔记]redis 5.0新特性--动态hz及相关优化
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">罗明</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">18</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">36</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#fread-read-fwrite-write实现与区别"><span class="nav-number">1.</span> <span class="nav-text">fread/read fwrite/write实现与区别</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#fflush、fsync实现与区别"><span class="nav-number">2.</span> <span class="nav-text">fflush、fsync实现与区别</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#延迟写"><span class="nav-number">2.1.</span> <span class="nav-text">延迟写</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#sync函数"><span class="nav-number">2.2.</span> <span class="nav-text">sync函数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#fsync函数"><span class="nav-number">2.3.</span> <span class="nav-text">fsync函数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#fdatasync函数"><span class="nav-number">2.4.</span> <span class="nav-text">fdatasync函数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#fflush"><span class="nav-number">2.5.</span> <span class="nav-text">fflush</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#内核缓冲区、应用缓冲区"><span class="nav-number">3.</span> <span class="nav-text">内核缓冲区、应用缓冲区</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#参考资料"><span class="nav-number">4.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">罗明</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.4.js"></script>
+  <script>AV.initialize("dsyBwqQYMTnV1RK3gWMNH29r-gzGzoHsz", "41tkvjbnAlNL7Tk0VyIBizQ6");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="扩容,redis,rehash," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="在Redis中，键值对（Key-Value Pair）存储方式是由字典（Dict）保存的，而字典底层是通过哈希表来实现的。通过哈希表中的节点保存字典中的键值对。我们知道当HashMap中由于Hash冲突（负载因子）超过某个阈值时，出于链表性能的考虑，会进行Resize的操作。Redis也一样。 在redis的具体实现中，使用了一种叫做渐进式哈希(rehashing)的机制来提高字典的缩放效率，避免">
+<meta name="keywords" content="扩容,redis,rehash">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[redis学习笔记]redis渐进式rehash机制">
+<meta property="og:url" content="http://yoursite.com/2018/11/12/[redis学习笔记]redis渐进式rehash机制/index.html">
+<meta property="og:site_name" content="LuoMing&#39;s Blog">
+<meta property="og:description" content="在Redis中，键值对（Key-Value Pair）存储方式是由字典（Dict）保存的，而字典底层是通过哈希表来实现的。通过哈希表中的节点保存字典中的键值对。我们知道当HashMap中由于Hash冲突（负载因子）超过某个阈值时，出于链表性能的考虑，会进行Resize的操作。Redis也一样。 在redis的具体实现中，使用了一种叫做渐进式哈希(rehashing)的机制来提高字典的缩放效率，避免">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2019-04-02T02:00:34.918Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="[redis学习笔记]redis渐进式rehash机制">
+<meta name="twitter:description" content="在Redis中，键值对（Key-Value Pair）存储方式是由字典（Dict）保存的，而字典底层是通过哈希表来实现的。通过哈希表中的节点保存字典中的键值对。我们知道当HashMap中由于Hash冲突（负载因子）超过某个阈值时，出于链表性能的考虑，会进行Resize的操作。Redis也一样。 在redis的具体实现中，使用了一种叫做渐进式哈希(rehashing)的机制来提高字典的缩放效率，避免">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2018/11/12/[redis学习笔记]redis渐进式rehash机制/"/>
+
+
+
+
+
+  <title>[redis学习笔记]redis渐进式rehash机制 | LuoMing's Blog</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">LuoMing's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">小白成长记</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/11/12/[redis学习笔记]redis渐进式rehash机制/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="罗明">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="LuoMing's Blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">[redis学习笔记]redis渐进式rehash机制</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-11-12T16:17:28+08:00">
+                2018-11-12
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/redis学习笔记/" itemprop="url" rel="index">
+                    <span itemprop="name">redis学习笔记</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2018/11/12/[redis学习笔记]redis渐进式rehash机制/" class="leancloud_visitors" data-flag-title="[redis学习笔记]redis渐进式rehash机制">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数&#58;</span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在Redis中，键值对（Key-Value Pair）存储方式是由字典（Dict）保存的，而字典底层是通过哈希表来实现的。通过哈希表中的节点保存字典中的键值对。我们知道当HashMap中由于Hash冲突（负载因子）超过某个阈值时，出于链表性能的考虑，会进行Resize的操作。Redis也一样。</p>
+<p>在redis的具体实现中，使用了一种叫做渐进式哈希(rehashing)的机制来提高字典的缩放效率，避免 rehash 对服务器性能造成影响，渐进式 rehash 的好处在于它采取分而治之的方式， 将 rehash 键值对所需的计算工作均摊到对字典的每个添加、删除、查找和更新操作上， 从而避免了集中式 rehash 而带来的庞大计算量。</p>
+<a id="more"></a>
+<h1 id="字典结构"><a href="#字典结构" class="headerlink" title="字典结构"></a>字典结构</h1><h2 id="哈希表节点"><a href="#哈希表节点" class="headerlink" title="哈希表节点"></a>哈希表节点</h2><pre><code>typedef struct dictEntry {
+    void *key;                //键
+    union {
+        void *val;            //值
+        uint64_t u64;
+        int64_t s64;
+        double d;
+    } v;
+    struct dictEntry *next; //指向下一个节点，形成链表
+} dictEntry;
+</code></pre><p>从哈希表节点结构中，可以看出，在redis中解决hash冲突的方式为采用链地址法。key和v分别用于保存键值对的键和值。</p>
+<h2 id="哈希表"><a href="#哈希表" class="headerlink" title="哈希表"></a>哈希表</h2><pre><code>/* This is our hash table structure. Every dictionary has two of this as we
+ * implement incremental rehashing, for the old to the new table. */
+typedef struct dictht {
+    dictEntry **table;
+    unsigned long size;
+    unsigned long sizemask;
+    unsigned long used;
+} dictht;
+</code></pre><ul>
+<li>table：哈希表数组，数组的每个项是dictEntry链表的头结点指针</li>
+<li>size：哈希表大小；在redis的实现中，size也是触发扩容的阈值</li>
+<li>sizemask：哈希表大小掩码，用于计算索引值；总是等于 size-1 ；</li>
+<li>used：哈希表中保存的节点的数量</li>
+</ul>
+<p>##字典</p>
+<pre><code>typedef struct dict {
+    dictType *type;
+    void *privdata;
+    dictht ht[2];
+    long rehashidx; /* rehashing not in progress if rehashidx == -1 */
+    unsigned long iterators; /* number of iterators currently running */
+} dict;
+</code></pre><ul>
+<li>type 属性是一个指向 dictType 结构的指针， 每个 dictType 结构保存了一簇用于操作特定类型键值对的函数， Redis 会为用途不同的字典设置不同的类型特定函数。</li>
+<li>而 privdata 属性则保存了需要传给那些类型特定函数的可选参数。</li>
+<li>dictht ht[2]：在字典内部，维护了两张哈希表。 一般情况下， 字典只使用 ht[0] 哈希表， ht[1] 哈希表只会在对 ht[0] 哈希表进行 rehash 时使用。</li>
+<li>rehashidx：和 rehash 有关的属性，它记录了 rehash 目前的进度， 如果目前没有在进行 rehash ， 那么它的值为 -1 。</li>
+</ul>
+<p>type 属性和 privdata 属性是针对不同类型的键值对， 为创建多态字典而设置的。</p>
+<h1 id="rehash检查"><a href="#rehash检查" class="headerlink" title="rehash检查"></a>rehash检查</h1><p>随着操作的不断执行， 哈希表保存的键值对会逐渐地增多或者减少， 为了让哈希表的负载因子（load factor）维持在一个合理的范围之内， 当哈希表保存的键值对数量太多或者太少时， 程序需要对哈希表的大小进行相应的扩展或者收缩。</p>
+<h2 id="扩容"><a href="#扩容" class="headerlink" title="扩容"></a>扩容</h2><p>redis中，每次插入键值对时，都会检查是否需要扩容。如果满足扩容条件，则进行扩容。</p>
+<p>在向redis中添加键时都会依次调用dictAddRaw –&gt; _dictKeyIndex –&gt; _dictExpandIfNeeded函数，在_dictExpandIfNeeded函数中会判断是否需要扩容。</p>
+<pre><code>/* Expand the hash table if needed */
+static int _dictExpandIfNeeded(dict *d)
+{
+    /* Incremental rehashing already in progress. Return. */
+    // 如果正在进行渐进式扩容，则返回OK
+    if (dictIsRehashing(d)) return DICT_OK;
+
+    /* If the hash table is empty expand it to the initial size. */
+    // 如果哈希表ht[0]的大小为0，则初始化字典
+    if (d-&gt;ht[0].size == 0) return dictExpand(d, DICT_HT_INITIAL_SIZE);
+
+    /* If we reached the 1:1 ratio, and we are allowed to resize the hash
+     * table (global setting) or we should avoid it but the ratio between
+     * elements/buckets is over the &quot;safe&quot; threshold, we resize doubling
+     * the number of buckets. */
+    /*
+     * 如果哈希表ht[0]中保存的key个数与哈希表大小的比例已经达到1:1，即保存的节点数已经大于哈希表大小
+     * 且redis服务当前允许执行rehash，或者保存的节点数与哈希表大小的比例超过了安全阈值（默认值为5）
+     * 则将哈希表大小扩容为原来的两倍
+     */
+    if (d-&gt;ht[0].used &gt;= d-&gt;ht[0].size &amp;&amp;
+        (dict_can_resize ||
+         d-&gt;ht[0].used/d-&gt;ht[0].size &gt; dict_force_resize_ratio))
+    {
+        return dictExpand(d, d-&gt;ht[0].used*2);
+    }
+    return DICT_OK;
+}
+</code></pre><p>从上面代码和注释可以看到，如果没有进行初始化或者满足扩容条件则对字典进行扩容。</p>
+<p>先来看看字典初始化，<strong>在redis中字典中的hash表也是采用延迟初始化</strong>策略，在创建字典的时候并没有为哈希表分配内存，只有当第一次插入数据时，才真正分配内存。看看字典创建函数dictCreate。</p>
+<pre><code>/* Create a new hash table */
+dict *dictCreate(dictType *type,
+        void *privDataPtr)
+{
+    dict *d = zmalloc(sizeof(*d));
+
+    _dictInit(d,type,privDataPtr);
+    return d;
+}
+
+/* Initialize the hash table */
+int _dictInit(dict *d, dictType *type,
+        void *privDataPtr)
+{
+    _dictReset(&amp;d-&gt;ht[0]);
+    _dictReset(&amp;d-&gt;ht[1]);
+    d-&gt;type = type;
+    d-&gt;privdata = privDataPtr;
+    d-&gt;rehashidx = -1;
+    d-&gt;iterators = 0;
+    return DICT_OK;
+}
+
+static void _dictReset(dictht *ht)
+{
+    ht-&gt;table = NULL;
+    ht-&gt;size = 0;
+    ht-&gt;sizemask = 0;
+    ht-&gt;used = 0;
+}
+</code></pre><p>从上面的创建过程可以看出，ht[0].table为NULL，且ht[0].size为0，直到第一次插入数据时，才调用dictExpand函数初始化。</p>
+<p>我们再看看dict_can_resize字段，该字段在dictEnableResize和dictDisableResize函数中分别赋值1和0，在updateDictResizePolicy函数中会调用者两个函数。</p>
+<pre><code>void updateDictResizePolicy(void) {
+    if (server.rdb_child_pid == -1 &amp;&amp; server.aof_child_pid == -1)
+        dictEnableResize();
+    else
+        dictDisableResize();
+}
+
+void dictEnableResize(void) {
+    dict_can_resize = 1;
+}
+
+void dictDisableResize(void) {
+    dict_can_resize = 0;
+}
+</code></pre><p>而在redis中每次开始执行aof文件重写或者开始生成新的RDB文件或者执行aof重写/生成RDB的子进程结束时，都会调用updateDictResizePolicy函数，所以从该函数中，也可以看出来，如果当前没有子进程在执行aof文件重写或者生成RDB文件，则运行进行字典扩容；否则禁止字典扩容。</p>
+<p>综上，字典扩容需要同时满足如下两个条件：</p>
+<p>（1）哈希表中保存的key数量超过了哈希表的大小（可以看出size既是哈希表大小，同时也是扩容阈值）</p>
+<p>（2）当前没有子进程在执行aof文件重写或者生成RDB文件；或者保存的节点数与哈希表大小的比例超过了安全阈值（默认值为5）</p>
+<p>也可以如下理解：</p>
+<p>当以下条件中的任意一个被满足时， 程序会自动开始对哈希表执行扩展操作：</p>
+<ul>
+<li><p>服务器目前没有在执行 BGSAVE 命令或者 BGREWRITEAOF 命令， 并且哈希表的负载因子大于等于 1 ；</p>
+</li>
+<li><p>服务器目前正在执行 BGSAVE 命令或者 BGREWRITEAOF 命令， 并且哈希表的负载因子大于等于 5 ；</p>
+</li>
+</ul>
+<h2 id="缩容"><a href="#缩容" class="headerlink" title="缩容"></a>缩容</h2><p> 当哈希表的负载因子小于 0.1 时， 程序自动开始对哈希表执行收缩操作。</p>
+<p>在周期函数serverCron中，调用databasesCron函数，该函数中会调用tryResizeHashTables函数检查用于保存键值对的redis数据库字典是否需要缩容。如果需要则调用dictResize进行缩容，dictResize函数中也是调用dictExpand函数。</p>
+<p>看看databasesCron中相关部分</p>
+<pre><code>if (server.rdb_child_pid == -1 &amp;&amp; server.aof_child_pid == -1) {
+    /* We use global counters so if we stop the computation at a given
+     * DB we&apos;ll be able to start from the successive in the next
+     * cron loop iteration. */
+    static unsigned int resize_db = 0;
+    static unsigned int rehash_db = 0;
+    int dbs_per_call = CRON_DBS_PER_CALL;
+    int j;
+
+    /* Don&apos;t test more DBs than we have. */
+    if (dbs_per_call &gt; server.dbnum) dbs_per_call = server.dbnum;
+
+    /* Resize */
+    for (j = 0; j &lt; dbs_per_call; j++) {
+        tryResizeHashTables(resize_db % server.dbnum);
+        resize_db++;
+    }
+</code></pre><p>可以看到要检查是否需要缩容的前提也是当前没有子进程执行aof重写或者生成RDB文件。</p>
+<pre><code>/* If the percentage of used slots in the HT reaches HASHTABLE_MIN_FILL
+ * we resize the hash table to save memory */
+void tryResizeHashTables(int dbid) {
+    if (htNeedsResize(server.db[dbid].dict))
+        dictResize(server.db[dbid].dict);
+    if (htNeedsResize(server.db[dbid].expires))
+        dictResize(server.db[dbid].expires);
+}
+
+/* Hash table parameters */
+#define HASHTABLE_MIN_FILL        10      /* Minimal hash table fill 10% */
+int htNeedsResize(dict *dict) {
+    long long size, used;
+
+    size = dictSlots(dict);
+    used = dictSize(dict);
+    return (size &gt; DICT_HT_INITIAL_SIZE &amp;&amp;
+            (used*100/size &lt; HASHTABLE_MIN_FILL));
+}
+
+/* Resize the table to the minimal size that contains all the elements,
+ * but with the invariant of a USED/BUCKETS ratio near to &lt;= 1 */
+int dictResize(dict *d)
+{
+    int minimal;
+
+    if (!dict_can_resize || dictIsRehashing(d)) return DICT_ERR;
+    minimal = d-&gt;ht[0].used;
+    if (minimal &lt; DICT_HT_INITIAL_SIZE)
+        minimal = DICT_HT_INITIAL_SIZE;
+    return dictExpand(d, minimal);
+}
+</code></pre><p>从htNeedsResize函数中可以看到，当哈希表保存的key数量与哈希表的大小的比例小于10%时需要缩容。最小容量为4。</p>
+<p>从dictResize函数中可以看到缩容时，缩容后的哈希表大小为当前哈希表中key的数量，当然经过dictExpand函数中_dictNextPower函数计算后，缩容后的大小为第一个大于等于当前key数量的2的n次方。最小容量为4。同样从dictResize函数中可以看到，如果当前正在执行 BGSAVE 命令或者 BGREWRITEAOF 命令，则不进行缩容（有篇文章中提到缩容时没有考虑bgsave，该说法是错误的）。</p>
+<h1 id="渐进式rehash"><a href="#渐进式rehash" class="headerlink" title="渐进式rehash"></a>渐进式rehash</h1><h2 id="渐进式rehash初始化"><a href="#渐进式rehash初始化" class="headerlink" title="渐进式rehash初始化"></a>渐进式rehash初始化</h2><p>从上面可以看到，不管是扩容还是缩容，最终都是调用dictExpand函数来完成。看看dictExpand函数实现。</p>
+<pre><code>/* Expand or create the hash table */
+int dictExpand(dict *d, unsigned long size)
+{
+    /* the size is invalid if it is smaller than the number of
+     * elements already inside the hash table */
+    if (dictIsRehashing(d) || d-&gt;ht[0].used &gt; size)
+        return DICT_ERR;
+
+    //计算新的哈希表大小，使得新的哈希表大小为一个2的n次方;大于等于size的第一个2的n次方
+    dictht n; /* the new hash table */
+    unsigned long realsize = _dictNextPower(size);
+
+    /* Rehashing to the same table size is not useful. */
+    if (realsize == d-&gt;ht[0].size) return DICT_ERR;
+
+    /* Allocate the new hash table and initialize all pointers to NULL */
+    n.size = realsize;
+    n.sizemask = realsize-1;
+    n.table = zcalloc(realsize*sizeof(dictEntry*));
+    n.used = 0;
+
+    /* Is this the first initialization? If so it&apos;s not really a rehashing
+     * we just set the first hash table so that it can accept keys. */
+    // 并非扩容，而是第一次初始化；前面说了，第一次初始化也是通过该函数完成
+    if (d-&gt;ht[0].table == NULL) {
+        d-&gt;ht[0] = n;
+        return DICT_OK;
+    }
+
+    /* Prepare a second hash table for incremental rehashing */
+    // 为渐进式扩容作准备，下面两个赋值非常重要
+    d-&gt;ht[1] = n;
+    d-&gt;rehashidx = 0;
+    return DICT_OK;
+}
+</code></pre><p>可以看到该函数计算一个新的哈希表大小，满足2的n次方，为什么要满足2的n次方？因为哈希表掩码sizemask为size-1，当size满足2的n次方时，计算每个key的索引值时只需要用key的hash值与掩码sizemask进行位与操作，替代求余操作，计算更快。</p>
+<p>然后分配了一个新的哈希表，为该哈希表分配了新的大小的内存。最后将该哈希表赋值给字典的ht[1]，然后将rehashidx赋值为0，打开渐进式rehash标志。同时该值也标志渐进式rehash当前已经进行到了哪个hash槽。</p>
+<p>从该函数中，我们并没有看到真正执行哈希表rehash的相关操作，只是分配了一个新的哈希表就结束了。我们知道哈希表rehash需要遍历原有的整个哈希表，对原有的所有key进行重新hash，存放到新的哈希槽。</p>
+<p>在redis的实现中，没有集中的将原有的key重新rehash到新的槽中，而是分解到各个命令的执行中，以及周期函数中。</p>
+<h2 id="操作辅助rehash"><a href="#操作辅助rehash" class="headerlink" title="操作辅助rehash"></a>操作辅助rehash</h2><p>在redis中每一个增删改查命令中都会判断数据库字典中的哈希表是否正在进行渐进式rehash，如果是则帮助执行一次。</p>
+<pre><code>dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
+{
+    long index;
+    dictEntry *entry;
+    dictht *ht;
+
+    if (dictIsRehashing(d)) _dictRehashStep(d);
+    ......
+}
+</code></pre><p>类似的在dictFind、dictGenericDelete、dictGetRandomKey、dictGetSomeKeys等函数中都有以下语句判断是否正在进行渐进式rehash。</p>
+<pre><code>if (dictIsRehashing(d)) _dictRehashStep(d);
+//dictIsRehashing(d)定义如下，rehashidx不等于-1即表示正在进行渐进式rehash
+#define dictIsRehashing(d) ((d)-&gt;rehashidx != -1)
+</code></pre><p>_dictRehashStep函数的定义如下：</p>
+<pre><code>/*
+ * 此函数仅执行一步hash表的重散列，并且仅当没有安全迭代器绑定到哈希表时。
+ * 当我们在重新散列中有迭代器时，我们不能混淆打乱两个散列表的数据，否则某些元素可能被遗漏或重复遍历。
+ *
+ * 该函数被在字典中查找或更新等普通操作调用，以致字典中的数据能自动的从哈系表１迁移到哈系表２
+ */
+static void _dictRehashStep(dict *d) {
+    if (d-&gt;iterators == 0) dictRehash(d,1);
+}
+</code></pre><h2 id="定时辅助rehash"><a href="#定时辅助rehash" class="headerlink" title="定时辅助rehash"></a>定时辅助rehash</h2><p>虽然redis实现了在读写操作时，辅助服务器进行渐进式rehash操作，但是如果服务器比较空闲，redis数据库将很长时间内都一直使用两个哈希表。所以在redis周期函数中，如果发现有字典正在进行渐进式rehash操作，则会花费<strong>1毫秒</strong>的时间，帮助一起进行渐进式rehash操作。</p>
+<p>在databasesCron函数中，实现如下：</p>
+<pre><code>/* Rehash */
+    if (server.activerehashing) {
+        for (j = 0; j &lt; dbs_per_call; j++) {
+            int work_done = incrementallyRehash(rehash_db);
+            if (work_done) {
+                /* If the function did some work, stop here, we&apos;ll do
+                 * more at the next cron loop. */
+                break;
+            } else {
+                /* If this db didn&apos;t need rehash, we&apos;ll try the next one. */
+                rehash_db++;
+                rehash_db %= server.dbnum;
+            }
+        }
+    }
+</code></pre><p>前提是配置了activerehashing，允许服务器在周期函数中辅助进行渐进式rehash，该参数默认值是1。</p>
+<pre><code>/* Our hash table implementation performs rehashing incrementally while
+ * we write/read from the hash table. Still if the server is idle, the hash
+ * table will use two tables for a long time. So we try to use 1 millisecond
+ * of CPU time at every call of this function to perform some rehahsing.
+ *
+ * The function returns 1 if some rehashing was performed, otherwise 0
+ * is returned. */
+int incrementallyRehash(int dbid) {
+    /* Keys dictionary */
+    if (dictIsRehashing(server.db[dbid].dict)) {
+        dictRehashMilliseconds(server.db[dbid].dict,1);
+        return 1; /* already used our millisecond for this loop... */
+    }
+    /* Expires */
+    if (dictIsRehashing(server.db[dbid].expires)) {
+        dictRehashMilliseconds(server.db[dbid].expires,1);
+        return 1; /* already used our millisecond for this loop... */
+    }
+    return 0;
+}
+
+/* Rehash for an amount of time between ms milliseconds and ms+1 milliseconds */
+int dictRehashMilliseconds(dict *d, int ms) {
+    long long start = timeInMilliseconds();
+    int rehashes = 0;
+
+    while(dictRehash(d,100)) {
+        rehashes += 100;
+        if (timeInMilliseconds()-start &gt; ms) break;
+    }
+    return rehashes;
+}
+</code></pre><h2 id="渐进式rehash实现"><a href="#渐进式rehash实现" class="headerlink" title="渐进式rehash实现"></a>渐进式rehash实现</h2><p>从上面可以看到，不管是在操作中辅助rehash执行，还是在周期函数中辅助执行，最终都是调用dictRehash函数。</p>
+<pre><code>/* Performs N steps of incremental rehashing. Returns 1 if there are still
+ * keys to move from the old to the new hash table, otherwise 0 is returned.
+ *
+ * Note that a rehashing step consists in moving a bucket (that may have more
+ * than one key as we use chaining) from the old to the new hash table, however
+ * since part of the hash table may be composed of empty spaces, it is not
+ * guaranteed that this function will rehash even a single bucket, since it
+ * will visit at max N*10 empty buckets in total, otherwise the amount of
+ * work it does would be unbound and the function may block for a long time. */
+int dictRehash(dict *d, int n) {
+    int empty_visits = n*10; /* Max number of empty buckets to visit. */
+    if (!dictIsRehashing(d)) return 0;
+
+    while(n-- &amp;&amp; d-&gt;ht[0].used != 0) {
+        dictEntry *de, *nextde;
+
+        /* Note that rehashidx can&apos;t overflow as we are sure there are more
+         * elements because ht[0].used != 0 */
+        assert(d-&gt;ht[0].size &gt; (unsigned long)d-&gt;rehashidx);
+        while(d-&gt;ht[0].table[d-&gt;rehashidx] == NULL) {
+            d-&gt;rehashidx++;
+            if (--empty_visits == 0) return 1;
+        }
+        de = d-&gt;ht[0].table[d-&gt;rehashidx];
+        /* Move all the keys in this bucket from the old to the new hash HT */
+        while(de) {
+            uint64_t h;
+
+            nextde = de-&gt;next;
+            /* Get the index in the new hash table */
+            h = dictHashKey(d, de-&gt;key) &amp; d-&gt;ht[1].sizemask;
+            de-&gt;next = d-&gt;ht[1].table[h];
+            d-&gt;ht[1].table[h] = de;
+            d-&gt;ht[0].used--;
+            d-&gt;ht[1].used++;
+            de = nextde;
+        }
+        d-&gt;ht[0].table[d-&gt;rehashidx] = NULL;
+        d-&gt;rehashidx++;
+    }
+
+    /* Check if we already rehashed the whole table... */
+    if (d-&gt;ht[0].used == 0) {
+        zfree(d-&gt;ht[0].table);
+        d-&gt;ht[0] = d-&gt;ht[1];
+        _dictReset(&amp;d-&gt;ht[1]);
+        d-&gt;rehashidx = -1;
+        return 0;
+    }
+
+    /* More to rehash... */
+    return 1;
+}
+</code></pre><h2 id="渐进式rehash小结"><a href="#渐进式rehash小结" class="headerlink" title="渐进式rehash小结"></a>渐进式rehash小结</h2><p>在redis中，扩展或收缩哈希表需要将 ht[0] 里面的所有键值对 rehash 到 ht[1] 里面， 但是， 这个 rehash 动作并不是一次性、集中式地完成的， 而是分多次、渐进式地完成的。为了避免 rehash 对服务器性能造成影响， 服务器不是一次性将 ht[0] 里面的所有键值对全部 rehash 到 ht[1] ， 而是分多次、渐进式地将 ht[0] 里面的键值对慢慢地 rehash 到 ht[1] 。</p>
+<p>以下是哈希表渐进式 rehash 的详细步骤：</p>
+<p>（1）为 ht[1] 分配空间， 让字典同时持有 ht[0] 和 ht[1] 两个哈希表。</p>
+<p>（2）在字典中维持一个索引计数器变量 rehashidx ， 并将它的值设置为 0 ， 表示 rehash 工作正式开始。</p>
+<p>（3）在 rehash 进行期间， 每次对字典执行添加、删除、查找或者更新操作时， 程序除了执行指定的操作以外， 还会顺带将 ht[0] 哈希表在 rehashidx 索引上的所有键值对 rehash 到 ht[1] ， 当 rehash 工作完成之后， 程序将 rehashidx 属性的值增一。</p>
+<p>（4）随着字典操作的不断执行， 最终在某个时间点上， ht[0] 的所有键值对都会被 rehash 至 ht[1] ， 这时程序将 rehashidx 属性的值设为 -1 ， 表示 rehash 操作已完成。</p>
+<p>渐进式 rehash 的好处在于它采取分而治之的方式， 将 rehash 键值对所需的计算工作均滩到对字典的每个添加、删除、查找和更新操作上， 从而避免了集中式 rehash 而带来的庞大计算量。</p>
+<h1 id="渐进式-rehash-执行期间的哈希表操作"><a href="#渐进式-rehash-执行期间的哈希表操作" class="headerlink" title="渐进式 rehash 执行期间的哈希表操作"></a>渐进式 rehash 执行期间的哈希表操作</h1><p>因为在进行渐进式 rehash 的过程中， 字典会同时使用 ht[0] 和 ht[1] 两个哈希表， 所以在渐进式 rehash 进行期间， 字典的删除（delete）、查找（find）、更新（update）等操作会在两个哈希表上进行： 比如说， 要在字典里面查找一个键的话， 程序会先在 ht[0] 里面进行查找， 如果没找到的话， 就会继续到 ht[1] 里面进行查找， 诸如此类。</p>
+<p>另外， 在渐进式 rehash 执行期间， 新添加到字典的键值对一律会被保存到 ht[1] 里面， 而 ht[0] 则不再进行任何添加操作： 这一措施保证了 ht[0] 包含的键值对数量会只减不增， 并随着 rehash 操作的执行而最终变成空表。</p>
+<p>#渐进式rehash带来的问题<br>渐进式rehash避免了redis阻塞，可以说非常完美，但是由于在rehash时，需要分配一个新的hash表，在rehash期间，同时有两个hash表在使用，会使得redis内存使用量瞬间突增，在Redis 满容状态下由于Rehash会导致大量Key驱逐。</p>
+<p>我们在生产上也遇到过这种情景。下面的博文《美团针对Redis Rehash机制的探索和实践》也有详细分析。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><ul>
+<li><a href="https://tech.meituan.com/Redis_Rehash_Practice_Optimization.html" target="_blank" rel="noopener">美团针对Redis Rehash机制的探索和实践</a></li>
+<li><a href="http://redisbook.com/preview/dict/rehashing.html" target="_blank" rel="noopener">rehash</a></li>
+<li><a href="http://redisbook.com/preview/dict/incremental_rehashing.html" target="_blank" rel="noopener">渐进式 rehash</a></li>
+<li><a href="https://blog.csdn.net/cqk0100/article/details/80400811" target="_blank" rel="noopener">浅谈Redis中的Rehash机制</a></li>
+<li><a href="https://cloud.tencent.com/developer/article/1005121" target="_blank" rel="noopener">redis 字典的实现</a></li>
+</ul>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/扩容/" rel="tag"># 扩容</a>
+          
+            <a href="/tags/redis/" rel="tag"># redis</a>
+          
+            <a href="/tags/rehash/" rel="tag"># rehash</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/11/11/[redis学习笔记]redis4.0新特性-非阻塞删除/" rel="next" title="[redis学习笔记]redis4.0新特性-非阻塞删除">
+                <i class="fa fa-chevron-left"></i> [redis学习笔记]redis4.0新特性-非阻塞删除
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2018/11/14/[redis学习笔记]redis rehash机制导致数据淘汰分析/" rel="prev" title="[redis学习笔记]redis字典rehash机制导致数据淘汰分析">
+                [redis学习笔记]redis字典rehash机制导致数据淘汰分析 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">罗明</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">18</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">36</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#字典结构"><span class="nav-number">1.</span> <span class="nav-text">字典结构</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#哈希表节点"><span class="nav-number">1.1.</span> <span class="nav-text">哈希表节点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#哈希表"><span class="nav-number">1.2.</span> <span class="nav-text">哈希表</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#rehash检查"><span class="nav-number">2.</span> <span class="nav-text">rehash检查</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#扩容"><span class="nav-number">2.1.</span> <span class="nav-text">扩容</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#缩容"><span class="nav-number">2.2.</span> <span class="nav-text">缩容</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#渐进式rehash"><span class="nav-number">3.</span> <span class="nav-text">渐进式rehash</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#渐进式rehash初始化"><span class="nav-number">3.1.</span> <span class="nav-text">渐进式rehash初始化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#操作辅助rehash"><span class="nav-number">3.2.</span> <span class="nav-text">操作辅助rehash</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#定时辅助rehash"><span class="nav-number">3.3.</span> <span class="nav-text">定时辅助rehash</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#渐进式rehash实现"><span class="nav-number">3.4.</span> <span class="nav-text">渐进式rehash实现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#渐进式rehash小结"><span class="nav-number">3.5.</span> <span class="nav-text">渐进式rehash小结</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#渐进式-rehash-执行期间的哈希表操作"><span class="nav-number">4.</span> <span class="nav-text">渐进式 rehash 执行期间的哈希表操作</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#参考资料"><span class="nav-number">5.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">罗明</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.4.js"></script>
+  <script>AV.initialize("dsyBwqQYMTnV1RK3gWMNH29r-gzGzoHsz", "41tkvjbnAlNL7Tk0VyIBizQ6");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
