@@ -6,9 +6,9 @@ tags:
 ---
 原文链接：[Difference between TreeSet, LinkedHashSet and HashSet in Java with Example](http://javarevisited.blogspot.hk/2012/11/difference-between-treeset-hashset-vs-linkedhashset-java.html)
 
-<!--more-->
-
 TreeSet,LinkedHashSet以及HashSet均实现了Set接口，因此他们都遵循Set接口的协议，比如他们都不允许重复的元素。尽管他们都来自同一类型的层次结构，但是他们之间还是有很多区别；理解他们之间的区别非常重要，这样您就可以根据您的需求选择最合适的集合实现。另外，TreeSet和HashSet（或者LinkedHashSet）之间的区别是一个非常流行的Java集合面试题，虽然不如“比较Hashtable和HashMap”或者“比较ArrayList和Vector”这类问题普遍，但是依然出现在各种Java面试中。在这篇文章中，我们将看看HashSet,TreeSet以及LinkedHashSet在各个方面之间的区别，比如元素顺序、性能、是否允许null值等，然后我们会看到在Java中什么时候使用TreeSet、LinkedHashSet、HashSet。
+
+<!--more-->
 
 # TreeSet,LinkedHashSet以及HashSet之间的区别
 TreeSet,LinkedHashSet以及HashSet是Java集合框架中Set接口的三种实现类型，并且像许多其他集合类型一样，他们也用于存储对象。TreeSet的主要特性是其中元素时排序的，LinkedHashSet的主要特性是其中元素是基于插入顺序的，HashSet则仅仅是用于存储对象这一通用集合功能。在Java中HashSet是基于HashMap实现的，而TreeSet是基于TreeMap实现的。TreeSet同时是一个SortedSet接口的实现，因此允许TreeSet中元素基于Comparable或者Comparator接口定义保持元素顺序排序。Comparable通常用于按照对象自然顺序排序，Comparator通常用于对象自定义排序，可以在创建TreeSet实例时提供这两种接口之一用于实例中元素排序。在了解TreeSet, LinkedHashSet 以及HashSet之间的区别之前，我们先看看他们之间的相同之处。

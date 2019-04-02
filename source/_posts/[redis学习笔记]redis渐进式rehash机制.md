@@ -1,5 +1,5 @@
 ---
-title: '[redis学习笔记]redis渐进式rehash机制[C'
+title: '[redis学习笔记]redis渐进式rehash机制'
 date: 2018-11-12 16:17:28
 categories: 'redis学习笔记'
 tags: [redis, 扩容, rehash]
