@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="redis,GEO,GeoHash,地理信息," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="GeoHash是一种地址编码，通过切分地图区域为小方块（切分次数越多，精度越高），它能把二维的经纬度编码成一维的字符串。也就是说，理论上geohash字符串表示的并不是一个点，而是一个矩形区域，只要矩形区域足够小，达到所需精度即可。">
+<meta name="keywords" content="redis,GEO,GeoHash,地理信息">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[redis学习笔记]GeoHash算法详解及其实现">
+<meta property="og:url" content="http://yoursite.com/2019/04/04/[redis学习笔记]GeoHash算法详解及其实现/index.html">
+<meta property="og:site_name" content="LuoMing&#39;s Blog">
+<meta property="og:description" content="GeoHash是一种地址编码，通过切分地图区域为小方块（切分次数越多，精度越高），它能把二维的经纬度编码成一维的字符串。也就是说，理论上geohash字符串表示的并不是一个点，而是一个矩形区域，只要矩形区域足够小，达到所需精度即可。">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E4%B8%80%E3%80%81GeoHash%E7%BC%96%E7%A0%81%E9%95%BF%E5%BA%A6%E4%B8%8E%E7%B2%BE%E5%BA%A6%E5%85%B3%E7%B3%BB.jpg">
+<meta property="og:image" content="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E4%BA%8C%E3%80%81%E7%BB%8F%E5%BA%A6%E5%88%92%E5%88%86%E7%A4%BA%E6%84%8F%E5%9B%BE.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E4%B8%89%E3%80%81Base32%E7%BC%96%E7%A0%81%E5%AD%97%E7%AC%A6%E5%AF%B9%E5%BA%94%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E5%85%AD%E3%80%81Base32%E7%BC%96%E7%A0%81%E7%A4%BA%E6%84%8F%E5%9B%BE.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E5%85%AB%E3%80%81Peano%E6%9B%B2%E7%BA%BF%E5%9B%BE.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E5%9B%9B%E3%80%81%E8%BE%B9%E7%95%8C%E9%97%AE%E9%A2%98%E7%A4%BA%E6%84%8F%E5%9B%BE.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E4%BA%94%E3%80%81%E7%9B%B8%E9%82%BB%E5%8C%BA%E5%9F%9F%E4%BA%8C%E8%BF%9B%E5%88%B6%E7%A0%81%E8%AE%A1%E7%AE%97%E6%96%B9%E5%BC%8F.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E4%B8%83%E3%80%81GeoHash%E7%AE%97%E6%B3%95%E7%90%86%E8%A7%A3%E5%8E%9F%E7%90%86%E5%9B%BE.png">
+<meta property="og:updated_time" content="2019-04-08T12:34:14.306Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="[redis学习笔记]GeoHash算法详解及其实现">
+<meta name="twitter:description" content="GeoHash是一种地址编码，通过切分地图区域为小方块（切分次数越多，精度越高），它能把二维的经纬度编码成一维的字符串。也就是说，理论上geohash字符串表示的并不是一个点，而是一个矩形区域，只要矩形区域足够小，达到所需精度即可。">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E4%B8%80%E3%80%81GeoHash%E7%BC%96%E7%A0%81%E9%95%BF%E5%BA%A6%E4%B8%8E%E7%B2%BE%E5%BA%A6%E5%85%B3%E7%B3%BB.jpg">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/04/04/[redis学习笔记]GeoHash算法详解及其实现/"/>
+
+
+
+
+
+  <title>[redis学习笔记]GeoHash算法详解及其实现 | LuoMing's Blog</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">LuoMing's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">小白成长记</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/04/04/[redis学习笔记]GeoHash算法详解及其实现/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="罗明">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="LuoMing's Blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">[redis学习笔记]GeoHash算法详解及其实现</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-04-04T15:56:43+08:00">
+                2019-04-04
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/redis学习笔记/" itemprop="url" rel="index">
+                    <span itemprop="name">redis学习笔记</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+             <span id="/2019/04/04/[redis学习笔记]GeoHash算法详解及其实现/" class="leancloud_visitors" data-flag-title="[redis学习笔记]GeoHash算法详解及其实现">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数&#58;</span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>GeoHash是一种地址编码，通过切分地图区域为小方块（切分次数越多，精度越高），它能把二维的经纬度编码成一维的字符串。也就是说，理论上geohash字符串表示的并不是一个点，而是一个矩形区域，只要矩形区域足够小，达到所需精度即可。</p>
+<a id="more"></a>
+<h1 id="GeoHash特点"><a href="#GeoHash特点" class="headerlink" title="GeoHash特点"></a>GeoHash特点</h1><ol>
+<li>纬度和经度是二维的数据，建索引的时候需要对纬度和经度同时建索引，geohash 能将二维的数据转化为一维的数据，可以用B树等索引</li>
+<li>geohash 生成的字符串代表的不是地图上的一个点， 而是地图上一个矩形的区域，在一定程度上能保证隐私。</li>
+<li>字符串越长，表示的范围能够更加的精确。 8位的geohash 编码的经度能达到19米左右，9位的geohash经度能达到米级，一般情况下能满足我们大部分的需求</li>
+<li>GeoHash值的前缀相同的位数越多，代表的位置越接近，可以方便索引。（反之不成立，位置接近的GeoHash值不一定相似）</li>
+<li>方案的缺点是：从geohash的编码算法中可以看出，靠近每个方块边界两侧的点虽然十分接近，但所属的编码会完全不同。</li>
+</ol>
+<p>GeoHash编码长度与精度的关系图<br><img src="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E4%B8%80%E3%80%81GeoHash%E7%BC%96%E7%A0%81%E9%95%BF%E5%BA%A6%E4%B8%8E%E7%B2%BE%E5%BA%A6%E5%85%B3%E7%B3%BB.jpg" alt=""></p>
+<p>在下面会介绍Base32编码以5bits为一组，且在经纬度二进制码交叉组合时偶数位为经度、奇数位为纬度，所以上图中当geohash长度为1时，即只有5bits，因此5bits中包含3bits的经度值和2bits的纬度值。</p>
+<h1 id="GeoHash计算步骤"><a href="#GeoHash计算步骤" class="headerlink" title="GeoHash计算步骤"></a>GeoHash计算步骤</h1><p>以杭州为例介绍GeoHash算法计算过程，杭州经纬度为（120.19，30.26）</p>
+<h2 id="根据经纬度计算GeoHash二进制编码"><a href="#根据经纬度计算GeoHash二进制编码" class="headerlink" title="根据经纬度计算GeoHash二进制编码"></a>根据经纬度计算GeoHash二进制编码</h2><p>杭州经度为120.19，如果对地球经度范围进行一次划分，分为[-180,0）和[0,180]两个区间，则120.19属于区间[0,180]，于是取编码1；然后再将[0, 180]分成 [0, 90), [90, 180]两个区间，而120.19位于[90, 180]，所以编码为1。以此类推，直到精度符合要求为止。得到经度的二进制编码为‭11010101011101111110101111<br>‬<br>编码过程如下图所示：<br><img src="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E4%BA%8C%E3%80%81%E7%BB%8F%E5%BA%A6%E5%88%92%E5%88%86%E7%A4%BA%E6%84%8F%E5%9B%BE.png" alt=""></p>
+<p>同理，地球纬度区间为[-90, 90]，进行同样的划分可以得到纬度的二进制编码为‭10101011000010010101010001‬‬</p>
+<p>将上述得到的经纬度二进制编码交叉进行组合，偶数位放经度，奇数位放纬度，把2串编码组合生成新串：‭‭1110011001100111001010100110101110111001100110101011‬‬（注意：是交叉进行组合，而不是简单地直接放纬度编码拼接在经度编码后面）</p>
+<h2 id="二进制编码进行Base32编码"><a href="#二进制编码进行Base32编码" class="headerlink" title="二进制编码进行Base32编码"></a>二进制编码进行Base32编码</h2><p>Base32编码，是将数字 0~9 ，加上26个字母(去除a,i,l,o 四个)总共32个字符进行组合而成的编码形式。数字与编码字符对应关系如下图所示：<br><img src="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E4%B8%89%E3%80%81Base32%E7%BC%96%E7%A0%81%E5%AD%97%E7%AC%A6%E5%AF%B9%E5%BA%94%E5%85%B3%E7%B3%BB.png" alt=""></p>
+<p>然后将获取到的经纬度二进制数以每5个数为一组，将每一组都进行转换成十进制数字。然后采用Base32对应编码进行转换可得到编码wtmknuxtmb0。比如我们的经纬度都分了10次，那么最后生成的字符串的长度就是4，范围是20km，如果我们经纬度都分20次，那么最后生成的字符串的长度就是8，范围可以精确到19m。</p>
+<p>杭州地理位置Base32编码示意图：<br><img src="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E5%85%AD%E3%80%81Base32%E7%BC%96%E7%A0%81%E7%A4%BA%E6%84%8F%E5%9B%BE.png" alt=""></p>
+<h1 id="GeoHash算法原理"><a href="#GeoHash算法原理" class="headerlink" title="GeoHash算法原理"></a>GeoHash算法原理</h1><p>上文讲了GeoHash的计算步骤，仅仅说明是什么而没有说明为什么？为什么分别给经度和维度编码？为什么需要将经纬度两串编码交叉组合成一串编码？</p>
+<p>如图所示，我们将二进制编码的结果填写到空间中，当将空间划分为四块时候，经度左半区间为0，右半区间为1，纬度下半区间 为0，上半区间为1，于是经纬度二进制编码交叉组合，得到编码的顺序分别是左下角00，左上角01，右下脚10，右上角11，也就是类似于Z的曲线，当我们递归的将各个块分解成更小的子块时，编码的顺序是自相似的（分形），每一个子块也形成Z曲线，这种类型的曲线被称为Peano空间填充曲线。</p>
+<p><img src="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E5%85%AB%E3%80%81Peano%E6%9B%B2%E7%BA%BF%E5%9B%BE.png" alt=""></p>
+<p>这种类型的空间填充曲线的优点是将二维空间转换成一维曲线（事实上是分形维），对大部分而言，编码相似的距离也相近， 但Peano空间填充曲线最大的缺点就是突变性，有些编码相邻但距离却相差很远，比如0111与1000，编码是相邻的，但距离相差很大。</p>
+<h1 id="边界问题"><a href="#边界问题" class="headerlink" title="边界问题"></a>边界问题</h1><p>上面也说了，这个算法看起来完美，但是稍微也有点问题，就是有些编码相邻但距离却相差很远，有些地理位置相对较近，却编码并不相邻。那么该怎么找出这些位置相近而编码不相邻的位置呢？<br><img src="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E5%9B%9B%E3%80%81%E8%BE%B9%E7%95%8C%E9%97%AE%E9%A2%98%E7%A4%BA%E6%84%8F%E5%9B%BE.png" alt=""></p>
+<p>按照单个区域情况考虑，就会出现如上所示的情况。所以就得想办法解决这种情况，就需要将范围进一步扩大。</p>
+<p>目前比较通行的做法就是我们不仅获取当前我们所在的矩形区域，还获取周围8个矩形块中的点。那么怎样定位周围8个点呢？关键就是需要获取周围8个点的经纬度，那我们已经知道自己的经纬度，只需要用自己的经纬度减去最小划分单位的经纬度就行。因为我们知道经纬度的范围,有知道需要划分的次数，所以很容易就能计算出最小划分单位的经纬度。<br><img src="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E4%BA%94%E3%80%81%E7%9B%B8%E9%82%BB%E5%8C%BA%E5%9F%9F%E4%BA%8C%E8%BF%9B%E5%88%B6%E7%A0%81%E8%AE%A1%E7%AE%97%E6%96%B9%E5%BC%8F.png" alt=""></p>
+<p>通过上面这张图，我们就能很容易的计算出周围8个点的经纬度了。有了经纬度就能定位到周围8个矩形块了。这样我们就能获取包括自己所在矩形块的9个矩形块中的所有的点。最后分别计算这些点和自己的距离（由于范围很小，点的数量就也很少，计算量就很少）过滤掉不满足条件的点就行了。</p>
+<p>在redis中，查找某个中心地理位置（longitude,latitude）周围radius范围内的点，先根据latitude和radius计算出经纬度二进制编码的长度step，即划分的次数，然后根据中心地理位置（longitude,latitude）、radius、step计算出中心位置的二进制编码，再计算出周边8个位置块的二进制编码，再依次计算9个位置块中的点是否满足距离要求。</p>
+<h1 id="GeoHash算法实现"><a href="#GeoHash算法实现" class="headerlink" title="GeoHash算法实现"></a>GeoHash算法实现</h1><p>GeoHash算法实现，这里主要展示redis中的实现方式：</p>
+<pre><code>typedef struct {
+    double min;
+    double max;
+} GeoHashRange;
+typedef struct {
+    uint64_t bits;
+    uint8_t step;
+} GeoHashBits;
+
+int geohashEncode(const GeoHashRange *long_range, const GeoHashRange *lat_range,
+              double longitude, double latitude, uint8_t step,
+              GeoHashBits *hash) {
+    /* Check basic arguments sanity. */
+    if (hash == NULL || step &gt; 32 || step == 0 ||
+        RANGEPISZERO(lat_range) || RANGEPISZERO(long_range)) return 0;
+
+    /* Return an error when trying to index outside the supported
+     * constraints. */
+    if (longitude &gt; 180 || longitude &lt; -180 ||
+        latitude &gt; 85.05112878 || latitude &lt; -85.05112878) return 0;
+
+    hash-&gt;bits = 0;
+    hash-&gt;step = step;
+
+    if (latitude &lt; lat_range-&gt;min || latitude &gt; lat_range-&gt;max ||
+        longitude &lt; long_range-&gt;min || longitude &gt; long_range-&gt;max) {
+        return 0;
+    }
+
+    double lat_offset =
+        (latitude - lat_range-&gt;min) / (lat_range-&gt;max - lat_range-&gt;min);
+    double long_offset =
+        (longitude - long_range-&gt;min) / (long_range-&gt;max - long_range-&gt;min);
+
+    /* convert to fixed point based on the step size */
+    lat_offset *= (1ULL &lt;&lt; step);
+    long_offset *= (1ULL &lt;&lt; step);
+    hash-&gt;bits = interleave64(lat_offset, long_offset);
+    return 1;
+}
+</code></pre><p>long_range和lat_range为地球经纬度的范围；hash-&gt;bits用户保存最终二进制编码结果，hash-&gt;step是经纬度划分的次数，在redis中该值为26，即经度/纬度的二进制编码长度为26，最终经交叉组合而成的地理位置的二进制编码为52位。Base32编码为每5bits组成一个字符，所以最终的GeoHash字符串为11位。</p>
+<p>为什么是52位？因为在redis中是把地理位置编码后的二进制值存入zset数据结构中，double类型的尾数部分长度为52位。</p>
+<p>上述算法在分别计算经度/纬度的二进制编码时，是先计算所求地理位置的经度/纬度在整个经度/纬度范围内的偏移，再乘以2的step次方。划分step次，会得到2的step次方个区域，区域值为0-（1&lt;&lt;step-1），所以偏移乘以2的step次方即可得到划分step次时改经度/纬度的二进制编码。</p>
+<p>下面以杭州经度二进制编码计算过程示意图如下，计算划分三次的情况下的编码：<br><img src="https://raw.githubusercontent.com/luoming1224/luoming1224.github.io/hexo/image/redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E4%B8%8E%E5%AE%9E%E7%8E%B0/%E5%9B%BE%E4%B8%83%E3%80%81GeoHash%E7%AE%97%E6%B3%95%E7%90%86%E8%A7%A3%E5%8E%9F%E7%90%86%E5%9B%BE.png" alt=""></p>
+<p>如上图所示，经度120.19在划分三次情况下的编码为110，等于 (120-(-180))/(180-(-180))*(1&lt;&lt;3)</p>
+<p>interleave64函数用于实现交叉组合经纬度的二进制编码，偶数位为经度，奇数位为纬度，改算法见stanford大学一个网站，该网页上有很多巧妙的位操作实现。算法实现如下所示：</p>
+<pre><code>/* Interleave lower bits of x and y, so the bits of x
+ * are in the even positions and bits from y in the odd;
+ * x and y must initially be less than 2**32 (65536).
+ * From:  https://graphics.stanford.edu/~seander/bithacks.html#InterleaveBMN
+ */
+static inline uint64_t interleave64(uint32_t xlo, uint32_t ylo) {
+    static const uint64_t B[] = {0x5555555555555555ULL, 0x3333333333333333ULL,
+                                 0x0F0F0F0F0F0F0F0FULL, 0x00FF00FF00FF00FFULL,
+                                 0x0000FFFF0000FFFFULL};
+    static const unsigned int S[] = {1, 2, 4, 8, 16};
+
+    uint64_t x = xlo;
+    uint64_t y = ylo;
+
+    x = (x | (x &lt;&lt; S[4])) &amp; B[4];
+    y = (y | (y &lt;&lt; S[4])) &amp; B[4];
+
+    x = (x | (x &lt;&lt; S[3])) &amp; B[3];
+    y = (y | (y &lt;&lt; S[3])) &amp; B[3];
+
+    x = (x | (x &lt;&lt; S[2])) &amp; B[2];
+    y = (y | (y &lt;&lt; S[2])) &amp; B[2];
+
+    x = (x | (x &lt;&lt; S[1])) &amp; B[1];
+    y = (y | (y &lt;&lt; S[1])) &amp; B[1];
+
+    x = (x | (x &lt;&lt; S[0])) &amp; B[0];
+    y = (y | (y &lt;&lt; S[0])) &amp; B[0];
+
+    return x | (y &lt;&lt; 1);
+}
+</code></pre><h2 id="GeoHash网站"><a href="#GeoHash网站" class="headerlink" title="GeoHash网站"></a>GeoHash网站</h2><p><a href="http://geohash.co/" target="_blank" rel="noopener">http://geohash.co/</a></p>
+<p><a href="http://geohash.org/" target="_blank" rel="noopener">http://geohash.org/</a></p>
+<h1 id="参考文章"><a href="#参考文章" class="headerlink" title="参考文章"></a>参考文章</h1><ul>
+<li><a href="https://zhuanlan.zhihu.com/p/35940647" target="_blank" rel="noopener">GeoHash算法学习讲解、解析及原理分析</a></li>
+<li><a href="http://ralphbupt.github.io/2017/06/28/geohash-%E7%9A%84%E5%8E%9F%E7%90%86%E5%8F%8A%E5%BA%94%E7%94%A8/" target="_blank" rel="noopener">geohash 的原理及应用</a></li>
+<li><a href="http://www.cnblogs.com/LBSer/p/3310455.html" target="_blank" rel="noopener">GeoHash核心原理解析</a></li>
+<li><a href="https://yq.aliyun.com/articles/62844" target="_blank" rel="noopener">阿里云Redis GEO地理位置功能上线啦</a></li>
+<li><a href="https://en.wikipedia.org/wiki/Geohash" target="_blank" rel="noopener">Geohash</a></li>
+</ul>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/redis/" rel="tag"># redis</a>
+          
+            <a href="/tags/GEO/" rel="tag"># GEO</a>
+          
+            <a href="/tags/GeoHash/" rel="tag"># GeoHash</a>
+          
+            <a href="/tags/地理信息/" rel="tag"># 地理信息</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/11/30/[Unix编程]fread fwrite fflush实现/" rel="next" title="[Unix编程]fread/fwrite/fflush实现">
+                <i class="fa fa-chevron-left"></i> [Unix编程]fread/fwrite/fflush实现
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/04/08/[redis学习笔记]redis中Geo命令介绍/" rel="prev" title="[redis学习笔记]redis中Geo命令介绍">
+                [redis学习笔记]redis中Geo命令介绍 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">罗明</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">20</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">39</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#GeoHash特点"><span class="nav-number">1.</span> <span class="nav-text">GeoHash特点</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#GeoHash计算步骤"><span class="nav-number">2.</span> <span class="nav-text">GeoHash计算步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#根据经纬度计算GeoHash二进制编码"><span class="nav-number">2.1.</span> <span class="nav-text">根据经纬度计算GeoHash二进制编码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二进制编码进行Base32编码"><span class="nav-number">2.2.</span> <span class="nav-text">二进制编码进行Base32编码</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#GeoHash算法原理"><span class="nav-number">3.</span> <span class="nav-text">GeoHash算法原理</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#边界问题"><span class="nav-number">4.</span> <span class="nav-text">边界问题</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#GeoHash算法实现"><span class="nav-number">5.</span> <span class="nav-text">GeoHash算法实现</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#GeoHash网站"><span class="nav-number">5.1.</span> <span class="nav-text">GeoHash网站</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#参考文章"><span class="nav-number">6.</span> <span class="nav-text">参考文章</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">罗明</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.4.js"></script>
+  <script>AV.initialize("dsyBwqQYMTnV1RK3gWMNH29r-gzGzoHsz", "41tkvjbnAlNL7Tk0VyIBizQ6");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
