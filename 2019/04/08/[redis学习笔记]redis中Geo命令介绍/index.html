@@ -87,7 +87,7 @@
 <meta property="og:site_name" content="LuoMing&#39;s Blog">
 <meta property="og:description" content="redis3.2开始新增了GEO地理位置相关的命令，本文对Geo相关命令使用及实现原理进行介绍。Redis将地理位置的52位GeoHash值作为有序集合的score，将地理位置存放在有序集合中进行保存。阅读本文前可以先阅读《GeoHash算法详解及其实现》，了解GeoHash算法。">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2019-04-09T08:33:11.467Z">
+<meta property="og:updated_time" content="2019-04-09T11:08:34.483Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="[redis学习笔记]redis中Geo命令介绍">
 <meta name="twitter:description" content="redis3.2开始新增了GEO地理位置相关的命令，本文对Geo相关命令使用及实现原理进行介绍。Redis将地理位置的52位GeoHash值作为有序集合的score，将地理位置存放在有序集合中进行保存。阅读本文前可以先阅读《GeoHash算法详解及其实现》，了解GeoHash算法。">
@@ -343,7 +343,7 @@
       
 
       
-        <p>redis3.2开始新增了GEO地理位置相关的命令，本文对Geo相关命令使用及实现原理进行介绍。Redis将地理位置的52位GeoHash值作为有序集合的score，将地理位置存放在有序集合中进行保存。阅读本文前可以先阅读《GeoHash算法详解及其实现》，了解GeoHash算法。</p>
+        <p>redis3.2开始新增了GEO地理位置相关的命令，本文对Geo相关命令使用及实现原理进行介绍。Redis将地理位置的52位GeoHash值作为有序集合的score，将地理位置存放在有序集合中进行保存。阅读本文前可以先阅读<a href="https://luoming1224.github.io/2019/04/04/[redis%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0]GeoHash%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3%E5%8F%8A%E5%85%B6%E5%AE%9E%E7%8E%B0/" target="_blank" rel="noopener">《GeoHash算法详解及其实现》</a>，了解GeoHash算法。</p>
 <a id="more"></a>
 <h1 id="GEOADD"><a href="#GEOADD" class="headerlink" title="GEOADD"></a>GEOADD</h1><p>增加地理位置坐标，命令格式如下：</p>
 <pre><code>GEOADD key longitude latitude member [longitude latitude member ...]
@@ -462,7 +462,7 @@ addReplyBulkCBuffer(c,buf,11);
 1) &quot;wtmknuxtmb0&quot;
 2) &quot;wtw3sq7kb30&quot;
 3) (nil)
-</code></pre><p>可以在<a href="http://geohash.org" target="_blank" rel="noopener">http://geohash.org</a>中使用geohash，如下的url<a href="http://geohash.org/wtmknuxtmb0" target="_blank" rel="noopener">http://geohash.org/wtmknuxtmb0</a>可以在地图中定位到杭州</p>
+</code></pre><p>可以在<a href="http://geohash.org" target="_blank" rel="noopener">http://geohash.org</a>中使用geohash，如下的url:<a href="http://geohash.org/wtmknuxtmb0" target="_blank" rel="noopener">http://geohash.org/wtmknuxtmb0</a>可以在地图中定位到杭州</p>
 <h1 id="GEOPOS"><a href="#GEOPOS" class="headerlink" title="GEOPOS"></a>GEOPOS</h1><p>返回指定成员的经纬度坐标，成员不存在则返回null。命令格式如下：</p>
 <pre><code>GEOPOS key member [member ...]
 </code></pre><p>经纬度坐标是被转成52位的GeoHash保存起来的，返回的时候重新解码成经纬度坐标。由于精度问题，返回值可能与设置的值略有差异。</p>
